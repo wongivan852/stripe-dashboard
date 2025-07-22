@@ -1,0 +1,3 @@
+"payout_id","effective_at","currency","gross","fee","net","reporting_category","balance_transaction_id","description","payout_expected_arrival_date","payout_status"
+"po_1M65JJBce5b3yUhVGFG1qZFP","2022-11-21 00:00:00","hkd","1.47","0.00","1.47","payout","txn_1M65JKBce5b3yUhVk3yFGkee","STRIPE PAYOUT","2022-11-21 00:00:00","failed"
+"po_1M65JJBce5b3yUhVGFG1qZFP","2022-11-21 17:03:13","hkd","-1.47","0.00","-1.47","payout_reversal","txn_1M6VuHBce5b3yUhVQSrCAYOC","REFUND FOR PAYOUT (STRIPE PAYOUT)",,

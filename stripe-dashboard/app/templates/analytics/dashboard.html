@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Analytics Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f7fa;
+            color: #2d3748;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .controls {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        select, input {
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .card h3 {
+            color: #2d3748;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .account-summary {
+            margin-bottom: 1rem;
+        }
+
+        .account-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .account-item:hover {
+            background: #e6fffa;
+            transform: translateX(5px);
+        }
+
+        .account-name {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .account-amount {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #38a169;
+        }
+
+        .status-breakdown {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-succeeded {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status-failed {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .status-pending {
+            background: #fef5e7;
+            color: #744210;
+        }
+
+        .metric-card {
+            text-align: center;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 2rem;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 1rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #718096;
+        }
+
+        .loading::after {
+            content: "⏳";
+            font-size: 2rem;
+            display: block;
+            margin-top: 1rem;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .tab {
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>💳 Payment Analytics Dashboard</h1>
+        <p>Comprehensive view of your Stripe account performance</p>
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <label for="accountSelect">Account:</label>
+                <select id="accountSelect">
+                    <option value="">All Accounts</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="yearSelect">Year:</label>
+                <select id="yearSelect">
+                    <option value="2024">2024</option>
+                    <option value="2025" selected>2025</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="monthSelect">Month:</label>
+                <select id="monthSelect">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+            
+            <button class="btn" onclick="loadData()">📊 Refresh Data</button>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('overview')">📊 Overview</div>
+            <div class="tab" onclick="showTab('monthly')">📅 Monthly</div>
+            <div class="tab" onclick="showTab('trends')">📈 Trends</div>
+        </div>
+
+        <div id="overview" class="tab-content active">
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>🏢 Account Summary</h3>
+                    <div id="accountSummary" class="loading">Loading account data...</div>
+                </div>
+                
+                <div class="card">
+                    <h3>📊 Total Revenue</h3>
+                    <div class="chart-container">
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>📈 Transaction Status</h3>
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="monthly" class="tab-content">
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>📅 Monthly Statement</h3>
+                    <div id="monthlyStatement" class="loading">Loading monthly data...</div>
+                </div>
+                
+                <div class="card">
+                    <h3>📊 Monthly Breakdown</h3>
+                    <div class="chart-container">
+                        <canvas id="monthlyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="trends" class="tab-content">
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>📈 Transaction Trends</h3>
+                    <div class="chart-container">
+                        <canvas id="trendsChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>🔢 Key Metrics</h3>
+                    <div id="keyMetrics" class="loading">Loading metrics...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let accountData = [];
+        let monthlyData = {};
+        let trendsData = [];
+        
+        // Chart instances
+        let revenueChart, statusChart, monthlyChart, trendsChart;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAccounts();
+            setCurrentMonth();
+            loadData();
+        });
+
+        async function loadAccounts() {
+            try {
+                const response = await fetch('/api/account-list');
+                const accounts = await response.json();
+                
+                const select = document.getElementById('accountSelect');
+                accounts.forEach(account => {
+                    const option = document.createElement('option');
+                    option.value = account.name;
+                    option.textContent = account.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading accounts:', error);
+            }
+        }
+
+        function setCurrentMonth() {
+            const now = new Date();
+            document.getElementById('monthSelect').value = now.getMonth() + 1;
+        }
+
+        async function loadData() {
+            await Promise.all([
+                loadAccountAmounts(),
+                loadMonthlyStatement(),
+                loadTrends()
+            ]);
+        }
+
+        async function loadAccountAmounts() {
+            try {
+                const response = await fetch('/api/account-amounts');
+                accountData = await response.json();
+                displayAccountSummary();
+                updateRevenueChart();
+                updateStatusChart();
+            } catch (error) {
+                console.error('Error loading account amounts:', error);
+                document.getElementById('accountSummary').innerHTML = '❌ Error loading data';
+            }
+        }
+
+        async function loadMonthlyStatement() {
+            try {
+                const year = document.getElementById('yearSelect').value;
+                const month = document.getElementById('monthSelect').value;
+                const account = document.getElementById('accountSelect').value;
+                
+                let url = `/api/monthly-statement?year=${year}&month=${month}`;
+                if (account) url += `&account=${encodeURIComponent(account)}`;
+                
+                const response = await fetch(url);
+                monthlyData = await response.json();
+                displayMonthlyStatement();
+                updateMonthlyChart();
+            } catch (error) {
+                console.error('Error loading monthly statement:', error);
+                document.getElementById('monthlyStatement').innerHTML = '❌ Error loading monthly data';
+            }
+        }
+
+        async function loadTrends() {
+            try {
+                const account = document.getElementById('accountSelect').value;
+                let url = '/api/transaction-trends?days=30';
+                if (account) url += `&account=${encodeURIComponent(account)}`;
+                
+                const response = await fetch(url);
+                trendsData = await response.json();
+                updateTrendsChart();
+                displayKeyMetrics();
+            } catch (error) {
+                console.error('Error loading trends:', error);
+            }
+        }
+
+        function displayAccountSummary() {
+            const container = document.getElementById('accountSummary');
+            
+            if (accountData.length === 0) {
+                container.innerHTML = '<p>No account data available</p>';
+                return;
+            }
+
+            let html = '';
+            accountData.forEach(account => {
+                html += `
+                    <div class="account-item">
+                        <div>
+                            <div class="account-name">${account.name}</div>
+                            <div class="status-breakdown">
+                                ${Object.entries(account.statuses).map(([status, data]) => 
+                                    `<span class="status-badge status-${status}">${status}: ${data.count} (${data.amount.toFixed(2)})</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        <div class="account-amount">${account.total_amount.toFixed(2)}</div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function displayMonthlyStatement() {
+            const container = document.getElementById('monthlyStatement');
+            
+            if (!monthlyData.accounts || Object.keys(monthlyData.accounts).length === 0) {
+                container.innerHTML = `<p>No data for ${monthlyData.month_name} ${monthlyData.year}</p>`;
+                return;
+            }
+
+            let html = `<h4>${monthlyData.month_name} ${monthlyData.year} Statement</h4>`;
+            
+            Object.values(monthlyData.accounts).forEach(account => {
+                html += `
+                    <div class="account-item">
+                        <div>
+                            <div class="account-name">${account.name}</div>
+                            <div class="status-breakdown">
+                                ${Object.entries(account.statuses).map(([status, data]) => 
+                                    `<span class="status-badge status-${status}">${status}: ${data.count} (${data.amount.toFixed(2)})</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        <div class="account-amount">${account.total_amount.toFixed(2)}</div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function displayKeyMetrics() {
+            const container = document.getElementById('keyMetrics');
+            
+            if (trendsData.length === 0) {
+                container.innerHTML = '<p>No trend data available</p>';
+                return;
+            }
+
+            const totalTransactions = trendsData.reduce((sum, item) => sum + item.count, 0);
+            const totalAmount = trendsData.reduce((sum, item) => sum + item.amount, 0);
+            const successfulTransactions = trendsData.filter(item => item.status === 'succeeded').reduce((sum, item) => sum + item.count, 0);
+            const successRate = totalTransactions > 0 ? (successfulTransactions / totalTransactions * 100) : 0;
+
+            container.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-value">${totalTransactions}</div>
+                    <div class="metric-label">Total Transactions</div>
+                </div>
+                <div class="metric-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); margin-top: 1rem;">
+                    <div class="metric-value">${totalAmount.toFixed(2)}</div>
+                    <div class="metric-label">Total Amount</div>
+                </div>
+                <div class="metric-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); margin-top: 1rem;">
+                    <div class="metric-value">${successRate.toFixed(1)}%</div>
+                    <div class="metric-label">Success Rate</div>
+                </div>
+            `;
+        }
+
+        function updateRevenueChart() {
+            const ctx = document.getElementById('revenueChart').getContext('2d');
+            
+            if (revenueChart) {
+                revenueChart.destroy();
+            }
+
+            const labels = accountData.map(account => account.name);
+            const data = accountData.map(account => account.total_amount);
+
+            revenueChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Total Revenue',
+                        data: data,
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(118, 75, 162, 0.8)',
+                            'rgba(240, 147, 251, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(102, 126, 234, 1)',
+                            'rgba(118, 75, 162, 1)',
+                            'rgba(240, 147, 251, 1)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return ' + value.toFixed(2);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateStatusChart() {
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            
+            if (statusChart) {
+                statusChart.destroy();
+            }
+
+            // Aggregate status data across all accounts
+            const statusTotals = {};
+            accountData.forEach(account => {
+                Object.entries(account.statuses).forEach(([status, data]) => {
+                    if (!statusTotals[status]) {
+                        statusTotals[status] = 0;
+                    }
+                    statusTotals[status] += data.count;
+                });
+            });
+
+            const labels = Object.keys(statusTotals);
+            const data = Object.values(statusTotals);
+            const colors = {
+                'succeeded': 'rgba(56, 161, 105, 0.8)',
+                'failed': 'rgba(245, 87, 108, 0.8)',
+                'pending': 'rgba(237, 137, 54, 0.8)',
+                'canceled': 'rgba(160, 174, 192, 0.8)'
+            };
+
+            statusChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels.map(label => label.charAt(0).toUpperCase() + label.slice(1)),
+                    datasets: [{
+                        data: data,
+                        backgroundColor: labels.map(label => colors[label] || 'rgba(160, 174, 192, 0.8)'),
+                        borderWidth: 3,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateMonthlyChart() {
+            const ctx = document.getElementById('monthlyChart').getContext('2d');
+            
+            if (monthlyChart) {
+                monthlyChart.destroy();
+            }
+
+            if (!monthlyData.accounts) return;
+
+            const accounts = Object.values(monthlyData.accounts);
+            const labels = accounts.map(account => account.name);
+            const data = accounts.map(account => account.total_amount);
+
+            monthlyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `${monthlyData.month_name} ${monthlyData.year}`,
+                        data: data,
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return ' + value.toFixed(2);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTrendsChart() {
+            const ctx = document.getElementById('trendsChart').getContext('2d');
+            
+            if (trendsChart) {
+                trendsChart.destroy();
+            }
+
+            if (trendsData.length === 0) return;
+
+            // Group by date and aggregate amounts
+            const dateGroups = {};
+            trendsData.forEach(item => {
+                if (!dateGroups[item.date]) {
+                    dateGroups[item.date] = 0;
+                }
+                if (item.status === 'succeeded') {
+                    dateGroups[item.date] += item.amount;
+                }
+            });
+
+            const labels = Object.keys(dateGroups).sort();
+            const data = labels.map(date => dateGroups[date]);
+
+            trendsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels.map(date => new Date(date).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Daily Revenue',
+                        data: data,
+                        borderColor: 'rgba(67, 233, 123, 1)',
+                        backgroundColor: 'rgba(67, 233, 123, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return ' + value.toFixed(2);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        // Update data when controls change
+        document.getElementById('accountSelect').addEventListener('change', loadData);
+        document.getElementById('yearSelect').addEventListener('change', loadMonthlyStatement);
+        document.getElementById('monthSelect').addEventListener('change', loadMonthlyStatement);
+    </script>
+</body>
+</html>

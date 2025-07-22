@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-speedometer2"></i> Dashboard</h1>
+            <button id="sync-btn" class="btn btn-primary">
+                <i class="bi bi-arrow-clockwise"></i> Sync Accounts
+            </button>
+        </div>
+        
+        <!-- Account Overview -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <h3>Account Overview</h3>
+            </div>
+            {% for summary in account_summary %}
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-building"></i> {{ summary.account.name }}
+                        </h5>
+                        <div class="row">
+                            <div class="col-6">
+                                <small class="text-muted">Total Transactions</small>
+                                <div class="h4">{{ summary.total_transactions }}</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Total Amount</small>
+                                <div class="h4">${{ "%.2f"|format(summary.total_amount) }}</div>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            {% if summary.has_api_key %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> API Key Active
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-exclamation-triangle"></i> No API Key
+                                </span>
+                            {% endif %}
+                            
+                            {% if summary.account.is_active %}
+                                <span class="badge bg-primary">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Recent Transactions -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-list-ul"></i> Recent Transactions</h5>
+                <div>
+                    <select id="account-filter" class="form-select form-select-sm" style="width: auto; display: inline-block;">
+                        <option value="">All Accounts</option>
+                        {% for summary in account_summary %}
+                        <option value="{{ summary.account.id }}">{{ summary.account.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button id="refresh-transactions" class="btn btn-sm btn-outline-secondary ms-2">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="transactions-container">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading transactions...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

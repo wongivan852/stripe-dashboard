@@ -1,0 +1,5 @@
+"balance_transaction_id","created","available_on","currency","gross","fee","net","reporting_category","description"
+"txn_3RNZZzKnAv1jsaW01v9ouYzU","2025-05-11 21:07:55","2025-05-18 08:00:00","hkd","94.82","6.05","88.77","charge",
+"txn_3RRSJWKnAv1jsaW00wT0I36h","2025-05-22 14:24:26","2025-05-29 08:00:00","hkd","4.26","2.09","2.17","charge",
+"txn_3RRT5IKnAv1jsaW01qO8YzA0","2025-05-22 14:58:33","2025-05-29 08:00:00","hkd","4.26","2.49","1.77","charge",
+"txn_3RSEmGKnAv1jsaW00b4Ng91W","2025-05-24 17:55:57","2025-05-31 08:00:00","hkd","96.18","4.12","92.06","charge",

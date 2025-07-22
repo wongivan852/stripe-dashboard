@@ -1,0 +1,2 @@
+"payout_id","effective_at","currency","gross","fee","net","reporting_category","balance_transaction_id","description","payout_expected_arrival_date","payout_status"
+"po_1Oy59bBce5b3yUhVGfFjxLKE","2024-03-26 00:00:00","hkd","457.86","0.00","457.86","payout","txn_1Oy59bBce5b3yUhVFaAPEKFj","STRIPE PAYOUT","2024-03-26 00:00:00","paid"

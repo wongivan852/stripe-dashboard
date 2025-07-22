@@ -1,0 +1,4 @@
+"balance_transaction_id","created","available_on","currency","gross","fee","net","reporting_category","description"
+"txn_3NiW6gBce5b3yUhV1wwKxz3P","2023-08-24 13:29:22","2023-08-31 00:00:00","hkd","210.00","9.49","200.51","charge","Order #243F7336CF, paymenttesting 997 (alexatangki+997@gmail.com)"
+"txn_3NiW6gBce5b3yUhV1zCAarWs","2023-08-24 18:05:02","2023-08-31 00:00:00","hkd","-210.00","0.00","-210.00","refund","REFUND FOR CHARGE (Order #243F7336CF, paymenttesting 997 (alexatangki+997@gmail.com))"
+"txn_3NjIcBBce5b3yUhV0hFsn4bJ","2023-08-26 17:17:08","2023-09-02 00:00:00","hkd","280.00","11.87","268.13","charge","Order #C599ECC15A, Ricky Fong (ricky.wh@gmail.com)"

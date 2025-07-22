@@ -1,0 +1,9 @@
+"category","description","net_amount","currency"
+"starting_balance","Starting balance (2023-10-01)","0.00","hkd"
+"activity_gross","Account activity before fees","0.00",
+"activity_fee","Less fees","0.00",
+"activity","Activity","0.00",
+"payouts_gross","Payouts to bank","0.00",
+"payouts_fee","Payout fees","0.00",
+"payouts","Total payouts","0.00",
+"ending_balance","Ending balance (2023-10-31)","0.00","hkd"

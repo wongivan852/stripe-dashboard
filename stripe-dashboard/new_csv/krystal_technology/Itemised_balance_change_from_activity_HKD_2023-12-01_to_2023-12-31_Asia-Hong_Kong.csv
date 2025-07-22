@@ -1,0 +1,6 @@
+"balance_transaction_id","created","available_on","currency","gross","fee","net","reporting_category","description"
+"txn_3OJYN8Bce5b3yUhV1TKTh0PM","2023-12-04 17:23:27","2023-12-11 00:00:00","hkd","300.00","12.55","287.45","charge","Order #C4D5D23F59, Virginia Cheung (virginia.cheung@cgu.edu)"
+"txn_3OJtMHBce5b3yUhV1EICILmN","2023-12-05 15:47:58","2023-12-12 00:00:00","hkd","4.00","2.49","1.51","charge",
+"txn_3OJtMHBce5b3yUhV1vjCbGBl","2023-12-05 15:49:43","2023-12-12 00:00:00","hkd","-4.00","0.00","-4.00","refund","REFUND FOR CHARGE"
+"txn_3OJuTLBce5b3yUhV0pLE5o9L","2023-12-05 16:59:20","2023-12-12 00:00:00","hkd","4.00","2.49","1.51","charge",
+"txn_3OJuTLBce5b3yUhV0nKGsnMA","2023-12-05 17:02:55","2023-12-12 00:00:00","hkd","-4.00","0.00","-4.00","refund","REFUND FOR CHARGE"
