@@ -60,6 +60,11 @@ A comprehensive Flask-based analytics dashboard for processing Stripe payment da
 
 5. **Run the application**
    ```bash
+   # Option 1: Use the startup script (recommended)
+   ./start.sh
+   
+   # Option 2: Manual activation
+   source venv/bin/activate
    python run.py
    ```
 
