@@ -1744,11 +1744,11 @@ def get_transactions_from_database(company_filter=None, status_filter=None, from
     # Apply filters
     if company_filter:
         # Handle different company filter formats
-        if company_filter.lower() == 'cgge':
+        if company_filter.lower() == 'cgge' or company_filter == '1':
             query = query.filter(StripeAccount.name == 'CGGE')
-        elif company_filter.lower() in ['krystal_institute', 'ki']:
+        elif company_filter.lower() in ['krystal_institute', 'ki'] or company_filter == '2':
             query = query.filter(StripeAccount.name == 'Krystal Institute')
-        elif company_filter.lower() in ['krystal_technology', 'kt']:
+        elif company_filter.lower() in ['krystal_technology', 'kt'] or company_filter == '3':
             query = query.filter(StripeAccount.name == 'Krystal Technology')
     
     # Date filtering
