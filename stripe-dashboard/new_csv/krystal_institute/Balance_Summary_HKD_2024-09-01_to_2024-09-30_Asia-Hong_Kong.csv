@@ -1,9 +1,0 @@
-"category","description","net_amount","currency"
-"starting_balance","Starting balance (2024-09-01)","528.45","hkd"
-"activity_gross","Account activity before fees","97.44","hkd"
-"activity_fee","Less fees","-4.14","hkd"
-"activity","Activity","93.30","hkd"
-"payouts_gross","Payouts to bank","0.00",
-"payouts_fee","Payout fees","0.00",
-"payouts","Total payouts","0.00",
-"ending_balance","Ending balance (2024-09-30)","621.75","hkd"

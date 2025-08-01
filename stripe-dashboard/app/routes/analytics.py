@@ -1705,6 +1705,121 @@ def statement_generator():
         </html>
         '''
 
+def get_transactions_from_database(company_filter=None, status_filter=None, from_date=None, to_date=None, period=None):
+    """Get transactions from database with filtering"""
+    from datetime import datetime, timedelta
+    
+    # Handle period parameter
+    if period and period.isdigit():
+        days = int(period)
+        to_date = datetime.now().date()
+        from_date = to_date - timedelta(days=days)
+    elif period == 'preset-nov2021':
+        from_date = datetime(2021, 11, 1).date()
+        to_date = datetime(2021, 11, 30).date()
+    elif period == 'preset-2021':
+        from_date = datetime(2021, 1, 1).date()
+        to_date = datetime(2021, 12, 31).date()
+    else:
+        # Convert string dates to date objects
+        if from_date and isinstance(from_date, str):
+            from_date = datetime.strptime(from_date, '%Y-%m-%d').date()
+        if to_date and isinstance(to_date, str):
+            to_date = datetime.strptime(to_date, '%Y-%m-%d').date()
+    
+    # Build database query
+    query = db.session.query(
+        Transaction.stripe_id,
+        Transaction.amount,
+        Transaction.fee,
+        Transaction.currency,
+        Transaction.status,
+        Transaction.type,
+        Transaction.stripe_created,
+        Transaction.customer_email,
+        Transaction.description,
+        StripeAccount.name.label('company_name')
+    ).join(StripeAccount)
+    
+    # Apply filters
+    if company_filter:
+        # Handle different company filter formats
+        if company_filter.lower() == 'cgge':
+            query = query.filter(StripeAccount.name == 'CGGE')
+        elif company_filter.lower() in ['krystal_institute', 'ki']:
+            query = query.filter(StripeAccount.name == 'Krystal Institute')
+        elif company_filter.lower() in ['krystal_technology', 'kt']:
+            query = query.filter(StripeAccount.name == 'Krystal Technology')
+    
+    # Date filtering
+    if from_date:
+        from_datetime = datetime.combine(from_date, datetime.min.time())
+        query = query.filter(Transaction.stripe_created >= from_datetime)
+    
+    if to_date:
+        to_datetime = datetime.combine(to_date, datetime.max.time())
+        query = query.filter(Transaction.stripe_created <= to_datetime)
+    
+    # Status filtering
+    if status_filter and status_filter != 'all':
+        if status_filter.lower() in ['successful', 'succeeded', 'paid']:
+            query = query.filter(Transaction.status.in_(['Paid', 'succeeded', 'paid']))
+        elif status_filter.lower() in ['failed', 'canceled']:
+            query = query.filter(Transaction.status.in_(['Failed', 'canceled', 'failed']))
+    
+    # Execute query and format results
+    results = query.order_by(Transaction.stripe_created.desc()).all()
+    
+    transactions = []
+    currency_totals = {}  # Track currency breakdowns
+    
+    for row in results:
+        # Convert amount from cents to dollars for display
+        amount_formatted = row.amount / 100.0 if row.amount else 0.0
+        fee_formatted = row.fee / 100.0 if row.fee else 0.0
+        currency = (row.currency or 'USD').upper()
+        
+        # Track currency totals
+        if currency not in currency_totals:
+            currency_totals[currency] = {
+                'count': 0,
+                'amount': 0.0,
+                'fees': 0.0,
+                'net': 0.0
+            }
+        
+        # Only count successful transactions in totals
+        if row.status and row.status.lower() in ['paid', 'succeeded']:
+            currency_totals[currency]['count'] += 1
+            currency_totals[currency]['amount'] += amount_formatted
+            currency_totals[currency]['fees'] += fee_formatted
+            currency_totals[currency]['net'] += (amount_formatted - fee_formatted)
+        
+        transaction = {
+            'id': row.stripe_id,
+            'account_name': row.company_name,
+            'amount': amount_formatted,
+            'fee': fee_formatted,
+            'currency': currency,
+            'status': row.status or 'Unknown',
+            'type': row.type or 'charge',
+            'stripe_created': row.stripe_created,
+            'customer_email': row.customer_email or '',
+            'description': row.description or '',
+            # Additional fields for compatibility with CSV format
+            'amount_refunded': 0.0,
+            'converted_amount': amount_formatted,
+            'converted_currency': currency,
+            'net_amount': amount_formatted - fee_formatted
+        }
+        transactions.append(transaction)
+    
+    # Add currency breakdown to the first transaction for easy access in templates
+    if transactions:
+        transactions[0]['currency_breakdown'] = currency_totals
+    
+    return transactions
+
 @analytics_bp.route('/statement-generator/generate')
 def generate_statement():
     """Generate statement based on form parameters"""
@@ -1720,9 +1835,8 @@ def generate_statement():
         # Debug logging
         print(f"Statement generation params: company={company_id}, status={status_filter}, format={format_type}, period={period}, from={from_date}, to={to_date}")
         
-        # Initialize CSV service and get transactions
-        csv_service = CSVTransactionService()
-        transactions = csv_service.get_all_transactions(
+        # Get transactions from database instead of CSV
+        transactions = get_transactions_from_database(
             company_filter=company_id,
             status_filter=status_filter,
             from_date=from_date,
@@ -2129,6 +2243,38 @@ def generate_detailed_statement(transactions, status_counts, total_amount, total
                 </div>
     '''
     
+    # Add currency breakdown section
+    currency_breakdown = transactions[0].get('currency_breakdown', {}) if transactions else {}
+    if currency_breakdown:
+        html += '''
+            </div>
+            
+            <!-- Currency Breakdown Section -->
+            <div class="statement-info" style="margin-bottom: 24px;">
+                <h3 style="margin-bottom: 16px; color: #1e293b;">💱 Currency Breakdown</h3>
+                <div class="summary-cards">
+        '''
+        
+        for currency, data in currency_breakdown.items():
+            if data['count'] > 0:  # Only show currencies with transactions
+                html += f'''
+                    <div class="summary-card" style="border-left: 4px solid #3b82f6;">
+                        <div class="summary-number" style="font-size: 1.5rem;">{currency}</div>
+                        <div class="summary-label">{data['count']} transactions</div>
+                        <div style="font-size: 0.9rem; color: #64748b; margin-top: 4px;">
+                            Amount: {currency} {data['amount']:,.2f}<br>
+                            Fees: {currency} {data['fees']:,.2f}<br>
+                            Net: {currency} {data['net']:,.2f}
+                        </div>
+                    </div>
+                '''
+        
+        html += '''
+            </div>
+            
+            <div class="summary-cards">
+        '''
+    
     # Add status breakdown cards
     for status, count in status_counts.items():
         html += f'''
@@ -2242,9 +2388,9 @@ def generate_detailed_statement(transactions, status_counts, total_amount, total
                             <td class="description-cell" title="{tx['description']}">{description}</td>
                             <td class="type-cell">{tx['type'] or 'N/A'}</td>
                             <td class="status-cell {status_class}">{tx['status'].title()}</td>
-                            <td class="amount-cell {amount_class}">HK${tx['amount']:,.2f}</td>
-                            <td class="amount-cell" style="color: #f59e0b; font-weight: 600;">HK${fee_amount:,.2f}</td>
-                            <td class="amount-cell" style="color: #10b981; font-weight: 600;">HK${net_amount:,.2f}</td>
+                            <td class="amount-cell {amount_class}">{tx['currency']} {tx['amount']:,.2f}</td>
+                            <td class="amount-cell" style="color: #f59e0b; font-weight: 600;">{tx['currency']} {fee_amount:,.2f}</td>
+                            <td class="amount-cell" style="color: #10b981; font-weight: 600;">{tx['currency']} {net_amount:,.2f}</td>
                             <td class="customer-cell" title="{tx['customer_email']}">{customer_email}</td>
                         </tr>
             '''
@@ -2321,7 +2467,7 @@ def generate_detailed_statement(transactions, status_counts, total_amount, total
                                 <td class="description-cell" title="{tx['description']}">{description}</td>
                                 <td class="type-cell">{tx['type'] or 'N/A'}</td>
                                 <td class="status-cell {status_class}">{tx['status'].title()}</td>
-                                <td class="amount-cell {amount_class}">HK${tx['amount']:,.2f}</td>
+                                <td class="amount-cell {amount_class}">{tx['currency']} {tx['amount']:,.2f}</td>
                                 <td class="customer-cell" title="{tx['customer_email']}">{customer_email}</td>
                             </tr>
                 '''

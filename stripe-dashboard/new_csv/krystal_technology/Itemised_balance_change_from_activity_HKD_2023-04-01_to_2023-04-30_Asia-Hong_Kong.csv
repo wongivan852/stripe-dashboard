@@ -1,5 +1,0 @@
-"balance_transaction_id","created","available_on","currency","gross","fee","net","reporting_category","description"
-"txn_3Mt1GfBce5b3yUhV0mIWAdTu","2023-04-04 12:14:50","2023-04-11 00:00:00","hkd","7.00","2.66","4.34","charge","Order #F9B3355DFF,  (revatio13+1233211@gmail.com)"
-"txn_3Mt1GfBce5b3yUhV0LO1RvOB","2023-04-04 12:23:39","2023-04-11 00:00:00","hkd","-7.00","0.00","-7.00","refund","REFUND FOR CHARGE (Order #F9B3355DFF,  (revatio13+1233211@gmail.com))"
-"txn_3Mt3V3Bce5b3yUhV05YxF2jQ","2023-04-04 14:37:50","2023-04-11 00:00:00","hkd","540.00","26.11","513.89","charge","Order #02ABD7C222,  (kofsucram+123321@yahoo.com)"
-"txn_3Mt3V3Bce5b3yUhV0lwMUkWv","2023-04-04 14:39:44","2023-04-11 00:00:00","hkd","-540.00","0.00","-540.00","refund","REFUND FOR CHARGE (Order #02ABD7C222,  (kofsucram+123321@yahoo.com))"

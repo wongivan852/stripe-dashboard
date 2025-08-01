@@ -1,4 +1,0 @@
-"balance_transaction_id","created","available_on","currency","gross","fee","net","reporting_category","description"
-"txn_3N68pBBce5b3yUhV0FrbhL5e","2023-05-10 16:56:42","2023-05-17 00:00:00","hkd","4.00","2.53","1.47","charge","Order #59944AD33B, eugene pong (chun.pong0914+123111@gmail.com)"
-"txn_3N6WHkBce5b3yUhV1jplMXSb","2023-05-11 17:59:44","2023-05-18 00:00:00","hkd","4.00","2.49","1.51","charge","Subscription update"
-"txn_1N6mgfBce5b3yUhVCcVa3jj2","2023-05-12 11:30:33","2023-05-12 11:30:33","hkd","-0.02","0.00","-0.02","fee","Billing (2023-05-11): Subscriptions"
