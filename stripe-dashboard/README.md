@@ -2,6 +2,8 @@
 
 A comprehensive Flask-based web application for analyzing Stripe transaction data across multiple companies with advanced reporting capabilities and currency handling.
 
+**📍 Repository**: [wongivan852/stripe-dashboard](https://github.com/wongivan852/stripe-dashboard)
+
 ## ✨ Features
 
 - **Multi-Company Analytics**: Support for multiple Stripe accounts (CGGE, Krystal Institute, Krystal Technology)
