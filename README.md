@@ -51,7 +51,7 @@ A comprehensive Flask-based web application for analyzing Stripe transaction dat
    ```
 
 6. **Access the dashboard**
-   - Open http://localhost:5001 in your browser
+   - Open http://localhost:8081 in your browser
 
 ## 📊 Application Structure
 
@@ -166,7 +166,7 @@ python -m pytest --cov=app tests/
 2. **Use a production WSGI server**
    ```bash
    pip install gunicorn
-   gunicorn -w 4 -b 0.0.0.0:5001 run:app
+   gunicorn -w 4 -b 0.0.0.0:8081 run:app
    ```
 
 3. **Set up reverse proxy** (nginx/Apache)
@@ -181,8 +181,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 COPY . .
-EXPOSE 5001
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5001", "run:app"]
+EXPOSE 8081
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8081", "run:app"]
 ```
 
 ## 📝 API Endpoints
@@ -286,7 +286,7 @@ For support and questions:
    ```
 
 6. **Access the dashboard**
-   Open http://localhost:5001 in your browser
+   Open http://localhost:8081 in your browser
 
 ## 📁 Project Structure
 

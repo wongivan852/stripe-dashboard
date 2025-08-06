@@ -81,10 +81,10 @@ def main():
     
     if not has_app_dir or not has_init_file or not has_models:
         print("⚠️ Missing required files. Starting minimal setup server...")
-        print("📱 Open http://localhost:5001 for setup instructions")
+        print("📱 Open http://localhost:8081 for setup instructions")
         
         app = create_minimal_app()
-        app.run(debug=True, host='0.0.0.0', port=5001)
+        app.run(debug=True, host='0.0.0.0', port=8081)
         return
     
     # Try to import the full app
@@ -95,7 +95,7 @@ def main():
         app = create_app()
         
         print("✅ Stripe Dashboard loaded successfully!")
-        print("📱 Open http://localhost:5001")
+        print("📱 Open http://localhost:8081")
         print("🔄 Press Ctrl+C to stop")
         
         with app.app_context():
@@ -105,14 +105,14 @@ def main():
             except Exception as e:
                 print(f"⚠️ Database warning: {e}")
         
-        app.run(debug=True, host='0.0.0.0', port=5001)
+        app.run(debug=True, host='0.0.0.0', port=8081)
         
     except ImportError as e:
         print(f"❌ Import error: {e}")
         print("🔧 Starting setup mode...")
         
         app = create_minimal_app()
-        app.run(debug=True, host='0.0.0.0', port=5001)
+        app.run(debug=True, host='0.0.0.0', port=8081)
     
     except Exception as e:
         print(f"❌ Error: {e}")
