@@ -17,8 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create instance directory
-RUN mkdir -p instance
+# Create instance directory and set permissions
+RUN mkdir -p instance && chmod 755 instance
 
 # Expose port
 EXPOSE 8081
@@ -26,10 +26,11 @@ EXPOSE 8081
 # Set environment variables
 ENV FLASK_ENV=production
 ENV PYTHONPATH=/app
+ENV DATABASE_URL=sqlite:///instance/payments.db
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8081/ || exit 1
 
-# Run the application
-CMD ["python", "run.py"]
+# Initialize database and run the application
+CMD ["sh", "-c", "python init_db.py && python run.py"]

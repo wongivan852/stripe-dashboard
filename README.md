@@ -156,34 +156,51 @@ python -m pytest --cov=app tests/
 
 ### Production Deployment
 
+#### Quick Deployment
+```bash
+# Clone and deploy
+git clone <repository-url>
+cd stripe-dashboard
+./deploy.sh
+```
+
+#### Manual Deployment
+
 1. **Set production environment variables**
-   ```env
-   FLASK_ENV=production
-   DEBUG=False
-   SECRET_KEY=your-production-secret-key
-   ```
-
-2. **Use a production WSGI server**
    ```bash
-   pip install gunicorn
-   gunicorn -w 4 -b 0.0.0.0:8081 run:app
+   cp .env.production .env
+   # Edit .env with your production values
    ```
 
-3. **Set up reverse proxy** (nginx/Apache)
-4. **Configure SSL certificates**
-5. **Set up database backups**
+2. **Initialize database**
+   ```bash
+   python init_db.py
+   ```
+
+3. **Start application**
+   ```bash
+   python run.py
+   ```
+
+#### Production WSGI Server
+```bash
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:8081 run:app
+```
 
 ### Docker Deployment
 
-```dockerfile
-FROM python:3.8-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-EXPOSE 8081
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8081", "run:app"]
+```bash
+# Build image
+docker build -t stripe-dashboard .
+
+# Run container
+docker run -d -p 8081:8081 \
+  -v $(pwd)/instance:/app/instance \
+  stripe-dashboard
 ```
+
+**Database Persistence:** The `instance/` directory contains the SQLite database and is mounted as a volume for data persistence.
 
 ## 📝 API Endpoints
 

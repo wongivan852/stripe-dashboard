@@ -1,106 +1,12 @@
-# Environment variables
-.env
+# Logs and temp files
+*.log
+flask.log
+app.log
+*.tmp
+
+# Environment
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
-# Python
+# Python cache
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-
-# Development files
-*.html
-*.pdf
-*.log
-*.txt
-import_*.py
-fix_*.py
-test_*.py
-debug_*.py
-temp_*.py
-*_temp.py
-
-# Virtual environment
-venv/
-env/
-
-# Temporary directories
-new_csv/
-temp/
-tmp/
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Database files (keep structure, exclude data)
-instance/*.db
-*.sqlite
-*.sqlite3
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual environment
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-app.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Flask
-instance/
-.webassets-cache
-
-# Testing
-.coverage
-.pytest_cache/
-htmlcov/
-
-# Node modules (if you add any frontend build tools later)
-node_modules/
+*.pyc

@@ -17,7 +17,13 @@ def create_app():
     
     # Configuration
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///payments.db')
+    # Configure database with flexible path for deployment
+    if os.getenv('DATABASE_URL'):
+        # Use environment variable if provided (production/Docker)
+        app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+    else:
+        # Default to relative path for development
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/payments.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Initialize extensions
@@ -135,9 +141,9 @@ def create_app():
     try:
         from app.routes.analytics import analytics_bp
         app.register_blueprint(analytics_bp, url_prefix='/analytics')
-        print("✅ Analytics blueprint registered successfully")
+        # Analytics blueprint registered successfully
     except ImportError as e:
-        print(f"⚠️  Analytics blueprint not found: {e}")
+        # Analytics blueprint not found - using fallback routes
         
         # Create fallback analytics routes directly in the main app
         @app.route('/analytics/simple')
@@ -408,6 +414,6 @@ def create_app():
                     'timestamp': datetime.now().isoformat()
                 }), 500
 
-        print("✅ Fallback analytics routes created")
+        # Fallback analytics routes created
     
     return app

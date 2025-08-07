@@ -8,33 +8,6 @@ echo ""
 
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
-    echo "❌ Virtual environment not found. Please run:"
-    echo "   python3 -m venv venv"
-    echo "   source venv/bin/activate"
-    echo "   pip install -r requirements.txt"
-    exit 1
-fi
-
-# Check if instance directory exists
-if [ ! -d "instance" ]; then
-    echo "📁 Creating instance directory for database..."
-    mkdir -p instance
-fi
-
-# Start the application using virtual environment Python
-echo "✅ Starting Flask application..."
-echo "📱 Open http://localhost:5001 in your browser"
-echo "🔄 Press Ctrl+C to stop"
-echo ""
-
-#!/bin/bash
-
-# Production startup script for Stripe Dashboard Analytics
-
-echo "🚀 Starting Stripe Dashboard Analytics..."
-
-# Check if virtual environment exists
-if [ ! -d "venv" ]; then
     echo "📦 Creating virtual environment..."
     python3 -m venv venv
 fi
@@ -43,9 +16,11 @@ fi
 echo "🔧 Activating virtual environment..."
 source venv/bin/activate
 
-# Install/update dependencies
-echo "📥 Installing dependencies..."
-pip install -r requirements.txt
+# Install/update dependencies if requirements.txt exists
+if [ -f "requirements.txt" ]; then
+    echo "📥 Installing/updating dependencies..."
+    pip install -r requirements.txt
+fi
 
 # Check if .env exists
 if [ ! -f ".env" ]; then
@@ -60,8 +35,9 @@ mkdir -p instance
 # Set production environment
 export FLASK_ENV=production
 
-echo "✅ Starting application on http://localhost:5001"
+echo "✅ Starting application on http://localhost:8081"
 echo "🔄 Press Ctrl+C to stop"
+echo ""
 
-# Start the application
-python run.py
+# Start the application with virtual environment activated
+source venv/bin/activate && python run.py

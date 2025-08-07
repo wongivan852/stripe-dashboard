@@ -12,8 +12,8 @@ def analyze_csv_vs_stripe_report():
     
     csv_file = '/Users/wongivan/stripe-dashboard/july25/cgge_unified_payments_20250731.csv'
     
-    print("🔍 Analyzing CGGE CSV vs Stripe Report...")
-    print("=" * 60)
+    # Analyzing CGGE CSV vs Stripe Report
+    # " + "=" * 60
     
     # Stripe report data
     stripe_count = 20
@@ -124,8 +124,8 @@ def analyze_csv_vs_stripe_report():
     
     # Detailed transaction list for manual verification
     print(f"\n📝 Detailed Successful Transaction List:")
-    print("ID | Date | Original | Converted | Fee | Status")
-    print("-" * 70)
+    # Header: ID | Date | Original | Converted | Fee | Status
+    # "-" * 70
     
     for tx in successful:
         tx_id = tx.get('id', 'N/A')[:20]

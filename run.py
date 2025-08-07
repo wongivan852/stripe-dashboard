@@ -72,7 +72,7 @@ def create_minimal_app():
 
 def main():
     """Main function to start the app"""
-    print("🔍 Checking Stripe Dashboard structure...")
+    # Check Stripe Dashboard structure
     
     # Check if we have the proper structure
     has_app_dir = os.path.exists('app')
@@ -80,8 +80,8 @@ def main():
     has_models = os.path.exists('app/models')
     
     if not has_app_dir or not has_init_file or not has_models:
-        print("⚠️ Missing required files. Starting minimal setup server...")
-        print("📱 Open http://localhost:8081 for setup instructions")
+        # Missing required files. Starting minimal setup server
+        # Open http://localhost:8081 for setup instructions
         
         app = create_minimal_app()
         app.run(debug=True, host='0.0.0.0', port=8081)
@@ -94,29 +94,29 @@ def main():
         
         app = create_app()
         
-        print("✅ Stripe Dashboard loaded successfully!")
-        print("📱 Open http://localhost:8081")
-        print("🔄 Press Ctrl+C to stop")
+        # Stripe Dashboard loaded successfully
+        # Open http://localhost:8081
+        # Press Ctrl+C to stop
         
         with app.app_context():
             try:
                 db.create_all()
-                print("✅ Database ready")
+                # Database ready
             except Exception as e:
-                print(f"⚠️ Database warning: {e}")
+                # Database warning suppressed for production
+                pass
         
         app.run(debug=True, host='0.0.0.0', port=8081)
         
     except ImportError as e:
-        print(f"❌ Import error: {e}")
-        print("🔧 Starting setup mode...")
+        # Import error - starting setup mode
         
         app = create_minimal_app()
         app.run(debug=True, host='0.0.0.0', port=8081)
     
     except Exception as e:
-        print(f"❌ Error: {e}")
-        print("🔧 Please check your configuration")
+        # Error - please check configuration
+        print(f"Error: {e}")
 
 if __name__ == '__main__':
     main()
