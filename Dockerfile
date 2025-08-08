@@ -17,8 +17,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create instance directory and set permissions
-RUN mkdir -p instance && chmod 755 instance
+# Create necessary directories and set permissions
+RUN mkdir -p instance csv_data july25 && chmod 755 instance csv_data july25
+
+# Create a symlink for backward compatibility
+RUN ln -sf july25 new_csv
 
 # Expose port
 EXPOSE 8081
@@ -27,6 +30,7 @@ EXPOSE 8081
 ENV FLASK_ENV=production
 ENV PYTHONPATH=/app
 ENV DATABASE_URL=sqlite:///instance/payments.db
+ENV CSV_DATA_PATH=/app/july25
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \

@@ -7,8 +7,90 @@ from app.services.csv_transaction_service import CSVTransactionService
 import json
 import csv
 import io
+import logging
 
 analytics_bp = Blueprint('analytics', __name__)
+
+# Setup logging for analytics
+logger = logging.getLogger(__name__)
+
+@analytics_bp.route('/api/csv-health')
+def csv_health_check():
+    """Health check endpoint for CSV functionality"""
+    try:
+        csv_service = CSVTransactionService()
+        health_status = csv_service.get_health_status()
+        
+        status_code = 200 if health_status['status'] == 'healthy' else 500
+        return jsonify(health_status), status_code
+        
+    except Exception as e:
+        logger.error(f"CSV health check failed: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+@analytics_bp.route('/api/csv-export')
+def csv_export():
+    """Export CSV transactions as downloadable file"""
+    try:
+        # Get filters from request parameters
+        company_filter = request.args.get('company')
+        status_filter = request.args.get('status')
+        from_date = request.args.get('from_date')
+        to_date = request.args.get('to_date')
+        period = request.args.get('period')
+        
+        # Initialize CSV service and get transactions
+        csv_service = CSVTransactionService()
+        transactions = csv_service.get_all_transactions(
+            company_filter=company_filter,
+            status_filter=status_filter,
+            from_date=from_date,
+            to_date=to_date,
+            period=period
+        )
+        
+        if not transactions:
+            return jsonify({
+                'error': 'No transactions found for export',
+                'filters_applied': {
+                    'company': company_filter,
+                    'status': status_filter,
+                    'from_date': from_date,
+                    'to_date': to_date,
+                    'period': period
+                }
+            }), 404
+        
+        # Generate CSV export
+        csv_content, filename = csv_service.export_transactions_to_csv(transactions)
+        
+        if not csv_content:
+            return jsonify({'error': 'Failed to generate CSV export'}), 500
+        
+        # Return CSV as downloadable file
+        response = Response(
+            csv_content,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
+        )
+        
+        logger.info(f"CSV export successful: {len(transactions)} transactions exported")
+        return response
+        
+    except Exception as e:
+        logger.error(f"CSV export failed: {e}")
+        return jsonify({
+            'error': 'CSV export failed',
+            'details': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 @analytics_bp.route('/api/verify-transactions')
 def verify_transactions():
@@ -377,9 +459,7 @@ def render_formatted_json(data):
             
             <div class="navigation">
                 <a href="/" class="nav-link">🏠 Home</a>
-                <a href="/analytics/dashboard" class="nav-link">📊 Dashboard</a>
                 <a href="/analytics/simple" class="nav-link">📋 Simple View</a>
-                <a href="/analytics/summary" class="nav-link">📈 Summary</a>
             </div>
             
             <div class="summary-cards">
@@ -477,266 +557,7 @@ def render_formatted_json(data):
     
     return html
 
-@analytics_bp.route('/summary')
-def account_summary():
-    """Quick account summary endpoint"""
-    try:
-        # Get all accounts with transaction counts
-        accounts = StripeAccount.query.filter_by(is_active=True).all()
-        
-        summary_data = []
-        total_transactions = 0
-        total_amount = 0
-        
-        for account in accounts:
-            # Get transaction count and total amount for this account
-            account_transactions = Transaction.query.filter_by(account_id=account.id).count()
-            
-            account_amount = db.session.query(func.sum(Transaction.amount))\
-                                   .filter_by(account_id=account.id)\
-                                   .scalar() or 0
-            
-            account_amount_hkd = account_amount / 100
-            
-            # Get status breakdown
-            status_breakdown = db.session.execute(text("""
-                SELECT status, COUNT(*) as count, SUM(amount) as total
-                FROM "transaction" 
-                WHERE account_id = :account_id
-                GROUP BY status
-            """), {'account_id': account.id}).fetchall()
-            
-            status_summary = {}
-            for status_row in status_breakdown:
-                status_summary[status_row[0]] = {
-                    'count': status_row[1],
-                    'amount_hkd': (status_row[2] or 0) / 100
-                }
-            
-            account_data = {
-                'name': account.name,
-                'account_id': account.account_id,
-                'stripe_account_id': account.account_id,
-                'transactions': account_transactions,
-                'total_amount_hkd': round(account_amount_hkd, 2),
-                'is_active': account.is_active,
-                'status_breakdown': status_summary
-            }
-            
-            summary_data.append(account_data)
-            total_transactions += account_transactions
-            total_amount += account_amount_hkd
-        
-        response_data = {
-            'success': True,
-            'timestamp': datetime.now().isoformat(),
-            'summary': {
-                'total_accounts': len(summary_data),
-                'total_transactions': total_transactions,
-                'total_amount_hkd': round(total_amount, 2)
-            },
-            'accounts': summary_data
-        }
-        
-        # Check if JSON is requested
-        if request.headers.get('Accept', '').find('application/json') != -1 or request.args.get('format') == 'json':
-            return jsonify(response_data)
-        
-        # Return HTML view
-        return render_summary_html(response_data)
-        
-    except Exception as e:
-        error_response = {
-            'success': False,
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        if request.headers.get('Accept', '').find('application/json') != -1:
-            return jsonify(error_response), 500
-        else:
-            return f'''
-            <div style="padding: 40px; text-align: center; background: #fef2f2;">
-                <h1 style="color: #dc2626;">❌ Error</h1>
-                <p>Error loading summary: {str(e)}</p>
-                <p><a href="/" style="color: #4f46e5;">← Back to Home</a></p>
-            </div>
-            '''
 
-def render_summary_html(data):
-    """Render summary data as HTML"""
-    html = f'''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Account Summary</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-            * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-            body {{ 
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-                background: #f8fafc; line-height: 1.6; color: #334155; padding: 20px;
-            }}
-            .container {{ max-width: 1200px; margin: 0 auto; }}
-            .header {{ 
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                color: white; padding: 2rem; text-align: center; border-radius: 12px; 
-                margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            }}
-            .navigation {{
-                display: flex; justify-content: center; gap: 15px; margin: 20px 0; padding: 20px;
-                background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-                flex-wrap: wrap;
-            }}
-            .nav-link {{
-                padding: 12px 24px; background: #4f46e5; color: white; text-decoration: none;
-                border-radius: 8px; transition: all 0.2s; font-weight: 500;
-            }}
-            .nav-link:hover {{ background: #4338ca; transform: translateY(-1px); }}
-            .summary-stats {{
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 20px; margin-bottom: 30px;
-            }}
-            .stat-card {{
-                background: white; padding: 20px; border-radius: 12px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.08); text-align: center;
-                border-left: 4px solid #4f46e5;
-            }}
-            .stat-number {{
-                font-size: 2.5rem; font-weight: bold; color: #1e293b; margin-bottom: 8px;
-            }}
-            .stat-label {{
-                color: #64748b; font-weight: 500;
-            }}
-            .accounts-grid {{
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-                gap: 20px; margin: 20px 0;
-            }}
-            .account-card {{
-                background: white; padding: 24px; border-radius: 12px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.08); border-left: 4px solid #4f46e5;
-            }}
-            .account-name {{
-                font-size: 1.4rem; font-weight: bold; margin-bottom: 16px;
-                color: #1e293b; display: flex; align-items: center; gap: 8px;
-            }}
-            .account-detail {{
-                display: flex; justify-content: space-between; padding: 8px 0;
-                border-bottom: 1px solid #f1f5f9; align-items: center;
-            }}
-            .account-detail:last-child {{ border-bottom: none; }}
-            .status-active {{ color: #10b981; font-weight: 600; }}
-            .status-inactive {{ color: #ef4444; font-weight: 600; }}
-            .status-breakdown {{
-                margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;
-            }}
-            .status-item {{
-                display: flex; justify-content: space-between; padding: 4px 0;
-                font-size: 0.9rem;
-            }}
-            .status-succeeded {{ color: #059669; }}
-            .status-failed {{ color: #dc2626; }}
-            .status-pending {{ color: #d97706; }}
-            .total-summary {{
-                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-                color: white; text-align: center; padding: 24px; border-radius: 12px;
-                margin-top: 24px; font-size: 1.3rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            }}
-            @media (max-width: 768px) {{
-                .container {{ padding: 10px; }}
-                .header {{ padding: 1.5rem; }}
-                .navigation {{ flex-direction: column; align-items: center; }}
-                .accounts-grid {{ grid-template-columns: 1fr; }}
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>📈 Account Summary</h1>
-                <p>Overview of all Stripe accounts and their performance</p>
-            </div>
-            
-            <div class="navigation">
-                <a href="/" class="nav-link">🏠 Home</a>
-                <a href="/analytics/dashboard" class="nav-link">📊 Dashboard</a>
-                <a href="/analytics/simple" class="nav-link">📋 Simple View</a>
-                <a href="/analytics/api/account-amounts" class="nav-link">🔗 API Data</a>
-            </div>
-            
-            <div class="summary-stats">
-                <div class="stat-card">
-                    <div class="stat-number">{data['summary']['total_accounts']}</div>
-                    <div class="stat-label">Active Accounts</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{data['summary']['total_transactions']:,}</div>
-                    <div class="stat-label">Total Transactions</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">HK${data['summary']['total_amount_hkd']:,.2f}</div>
-                    <div class="stat-label">Total Revenue</div>
-                </div>
-            </div>
-            
-            <div class="accounts-grid">
-    '''
-    
-    for account in data['accounts']:
-        status_class = "status-active" if account['is_active'] else "status-inactive"
-        status_text = "✅ Active" if account['is_active'] else "❌ Inactive"
-        
-        html += f'''
-        <div class="account-card">
-            <div class="account-name">🏢 {account['name']}</div>
-            <div class="account-detail">
-                <span>Status:</span>
-                <span class="{status_class}">{status_text}</span>
-            </div>
-            <div class="account-detail">
-                <span>Account ID:</span>
-                <span>{account['account_id'] or 'N/A'}</span>
-            </div>
-            <div class="account-detail">
-                <span>Total Transactions:</span>
-                <span><strong>{account['transactions']:,}</strong></span>
-            </div>
-            <div class="account-detail">
-                <span>Total Amount:</span>
-                <span><strong>HK${account['total_amount_hkd']:,.2f}</strong></span>
-            </div>
-        '''
-        
-        if account['status_breakdown']:
-            html += '<div class="status-breakdown"><strong>Status Breakdown:</strong>'
-            for status, status_data in account['status_breakdown'].items():
-                status_class = f"status-{status}"
-                html += f'''
-                <div class="status-item">
-                    <span class="{status_class}">{status.title()}:</span>
-                    <span>{status_data['count']} (HK${status_data['amount_hkd']:,.2f})</span>
-                </div>
-                '''
-            html += '</div>'
-        
-        html += '</div>'
-    
-    html += f'''
-            </div>
-            
-            <div class="total-summary">
-                🎯 Overall Performance: {data['summary']['total_accounts']} accounts managing {data['summary']['total_transactions']:,} transactions worth HK${data['summary']['total_amount_hkd']:,.2f}
-            </div>
-        </div>
-        <script>
-            // Auto-refresh every 5 minutes
-            setTimeout(() => location.reload(), 300000);
-        </script>
-    </body>
-    </html>
-    '''
-    
-    return html
 
 @analytics_bp.route('/simple')
 def simple_analytics():
@@ -850,11 +671,9 @@ def simple_analytics():
                 
                 <div class="navigation">
                     <a href="/" class="nav-link">🏠 Home</a>
-                    <a href="/analytics/dashboard" class="nav-link">📊 Dashboard</a>
-                    <a href="/analytics/simple" class="nav-link">📋 Simple View</a>
+                        <a href="/analytics/simple" class="nav-link">📋 Simple View</a>
                     <a href="/analytics/api/account-amounts" class="nav-link">🔗 API Data</a>
-                    <a href="/analytics/summary" class="nav-link">📈 Summary</a>
-                </div>
+                    </div>
         '''
         
         # Generate HTML for each account
@@ -944,419 +763,12 @@ def simple_analytics():
                 <div class="nav">
                     <a href="/">← Back to Home</a>
                     <a href="/analytics/api/account-amounts">🔗 Try API Data</a>
-                    <a href="/analytics/summary">📈 Try Summary</a>
                 </div>
             </div>
         </body>
         </html>
         '''
 
-@analytics_bp.route('/dashboard')
-def dashboard():
-    """Interactive analytics dashboard with charts"""
-    try:
-        # Get comprehensive account data including fees
-        results = db.session.execute(text("""
-            SELECT 
-                sa.name as account_name,
-                t.status,
-                t.type,
-                COUNT(t.id) as count,
-                SUM(t.amount) as total,
-                SUM(COALESCE(t.fee, 0)) as fees
-            FROM stripe_account sa
-            LEFT JOIN "transaction" t ON sa.id = t.account_id
-            WHERE sa.is_active = 1
-            GROUP BY sa.name, t.status, t.type
-            ORDER BY sa.name, t.status, t.type
-        """)).fetchall()
-        
-        # Process data for charts
-        accounts_data = {}
-        for row in results:
-            account_name, status, tx_type, count, total, fees = row
-            if account_name not in accounts_data:
-                accounts_data[account_name] = {
-                    'name': account_name,
-                    'total_amount': 0,
-                    'total_fees': 0,
-                    'net_amount': 0,
-                    'total_count': 0,
-                    'statuses': {},
-                    'types': {}
-                }
-            
-            if status and tx_type and count:  # Only process valid data
-                amount = (total or 0) / 100
-                fee_amount = (fees or 0) / 100
-                net_amount = amount - fee_amount
-                
-                accounts_data[account_name]['total_amount'] += amount
-                accounts_data[account_name]['total_fees'] += fee_amount
-                accounts_data[account_name]['net_amount'] += net_amount
-                accounts_data[account_name]['total_count'] += count
-                
-                # Group by status
-                if status not in accounts_data[account_name]['statuses']:
-                    accounts_data[account_name]['statuses'][status] = {'count': 0, 'amount': 0, 'fees': 0, 'net': 0}
-                accounts_data[account_name]['statuses'][status]['count'] += count
-                accounts_data[account_name]['statuses'][status]['amount'] += amount
-                accounts_data[account_name]['statuses'][status]['fees'] += fee_amount
-                accounts_data[account_name]['statuses'][status]['net'] += net_amount
-                
-                # Group by type
-                if tx_type not in accounts_data[account_name]['types']:
-                    accounts_data[account_name]['types'][tx_type] = {'count': 0, 'amount': 0, 'fees': 0, 'net': 0}
-                accounts_data[account_name]['types'][tx_type]['count'] += count
-                accounts_data[account_name]['types'][tx_type]['amount'] += amount
-                accounts_data[account_name]['types'][tx_type]['fees'] += fee_amount
-                accounts_data[account_name]['types'][tx_type]['net'] += net_amount
-        
-        # Create JSON data for charts
-        chart_data = json.dumps(list(accounts_data.values()))
-        
-        # Calculate totals
-        total_amount = sum(acc['total_amount'] for acc in accounts_data.values())
-        total_fees = sum(acc['total_fees'] for acc in accounts_data.values())
-        net_amount = sum(acc['net_amount'] for acc in accounts_data.values())
-        total_transactions = sum(acc['total_count'] for acc in accounts_data.values())
-        total_accounts = len(accounts_data)
-        avg_transaction = total_amount / total_transactions if total_transactions > 0 else 0
-        fee_percentage = (total_fees / total_amount * 100) if total_amount > 0 else 0
-        
-        html = f'''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Stripe Analytics Dashboard</title>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-            <style>
-                * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-                body {{ 
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-                    background: #f8fafc; line-height: 1.6; color: #334155;
-                }}
-                .container {{ max-width: 1400px; margin: 0 auto; padding: 20px; }}
-                .header {{ 
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                    color: white; padding: 2rem; text-align: center; border-radius: 12px; 
-                    margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-                }}
-                .header h1 {{ font-size: 2.5rem; margin-bottom: 0.5rem; }}
-                .header p {{ font-size: 1.1rem; opacity: 0.9; }}
-                .navigation {{
-                    display: flex; justify-content: center; gap: 15px; margin: 20px 0; padding: 20px;
-                    background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-                    flex-wrap: wrap;
-                }}
-                .nav-link {{
-                    padding: 12px 24px; background: #4f46e5; color: white; text-decoration: none;
-                    border-radius: 8px; transition: all 0.2s; font-weight: 500;
-                }}
-                .nav-link:hover {{ background: #4338ca; transform: translateY(-1px); }}
-                .stats-grid {{
-                    display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                    gap: 20px; margin-bottom: 30px;
-                }}
-                .stat-card {{
-                    background: white; padding: 24px; border-radius: 12px; 
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.08); text-align: center;
-                    border-left: 4px solid #4f46e5;
-                }}
-                .stat-number {{ 
-                    font-size: 2.5rem; font-weight: bold; color: #1e293b; margin-bottom: 8px;
-                }}
-                .stat-label {{ color: #64748b; font-size: 1rem; font-weight: 500; }}
-                .charts-section {{ margin-bottom: 30px; }}
-                .charts-grid {{
-                    display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
-                    gap: 30px;
-                }}
-                .chart-container {{
-                    background: white; padding: 24px; border-radius: 12px; 
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.08); height: 400px;
-                }}
-                .chart-title {{ 
-                    font-size: 1.3rem; font-weight: bold; margin-bottom: 20px; 
-                    color: #1e293b; text-align: center;
-                }}
-                .chart-canvas {{ position: relative; height: 300px; width: 100%; }}
-                .account-details {{
-                    display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-                    gap: 20px; margin-top: 30px;
-                }}
-                .account-card {{
-                    background: white; padding: 24px; border-radius: 12px; 
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.08); border-left: 4px solid #4f46e5;
-                }}
-                .account-name {{ 
-                    font-size: 1.4rem; font-weight: bold; margin-bottom: 16px; 
-                    color: #1e293b; display: flex; align-items: center; gap: 8px;
-                }}
-                .detail-item {{
-                    display: flex; justify-content: space-between; padding: 12px 0;
-                    border-bottom: 1px solid #f1f5f9; align-items: center;
-                }}
-                .detail-item:last-child {{ border-bottom: none; }}
-                .detail-label {{ color: #64748b; font-weight: 500; }}
-                .detail-value {{ font-weight: 600; color: #1e293b; }}
-                .status-badge {{
-                    padding: 4px 8px; border-radius: 4px; font-size: 0.875rem; font-weight: 500;
-                }}
-                .status-succeeded {{ background: #dcfce7; color: #166534; }}
-                .status-failed {{ background: #fef2f2; color: #991b1b; }}
-                .status-canceled {{ background: #f1f5f9; color: #475569; }}
-                .status-pending {{ background: #fef3c7; color: #92400e; }}
-                @media (max-width: 768px) {{
-                    .container {{ padding: 10px; }}
-                    .header {{ padding: 1.5rem; }}
-                    .header h1 {{ font-size: 2rem; }}
-                    .charts-grid {{ grid-template-columns: 1fr; }}
-                    .account-details {{ grid-template-columns: 1fr; }}
-                    .navigation {{ flex-direction: column; align-items: center; }}
-                    .chart-container {{ height: 350px; }}
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>📊 Stripe Analytics Dashboard</h1>
-                    <p>Real-time transaction analytics and insights</p>
-                </div>
-                
-                <div class="navigation">
-                    <a href="/" class="nav-link">🏠 Home</a>
-                    <a href="/analytics/dashboard" class="nav-link">📊 Dashboard</a>
-                    <a href="/analytics/simple" class="nav-link">📋 Simple View</a>
-                    <a href="/analytics/statement-generator" class="nav-link">📄 Statement Generator</a>
-                    <a href="/analytics/api/account-amounts" class="nav-link">🔗 API Data</a>
-                    <a href="/analytics/summary" class="nav-link">📈 Summary</a>
-                </div>
-                
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-number">{total_accounts}</div>
-                        <div class="stat-label">Active Accounts</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">{total_transactions:,}</div>
-                        <div class="stat-label">Total Transactions</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">HK${total_amount:,.0f}</div>
-                        <div class="stat-label">Total Revenue</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">HK${avg_transaction:,.0f}</div>
-                        <div class="stat-label">Avg Transaction</div>
-                    </div>
-                </div>
-                
-                <div class="charts-section">
-                    <div class="charts-grid">
-                        <div class="chart-container">
-                            <div class="chart-title">Revenue by Account</div>
-                            <div class="chart-canvas">
-                                <canvas id="revenueChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="chart-container">
-                            <div class="chart-title">Transaction Count by Account</div>
-                            <div class="chart-canvas">
-                                <canvas id="transactionChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="account-details">
-        '''
-        
-        # Account details
-        for account_name, data in accounts_data.items():
-            html += f'''
-            <div class="account-card">
-                <div class="account-name">🏢 {account_name}</div>
-                <div class="detail-item">
-                    <span class="detail-label">Total Revenue:</span>
-                    <span class="detail-value">HK${data['total_amount']:,.2f}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Total Transactions:</span>
-                    <span class="detail-value">{data['total_count']:,}</span>
-                </div>
-            '''
-            
-            # Show status breakdown
-            for status, status_data in data['statuses'].items():
-                html += f'''
-                <div class="detail-item">
-                    <span class="detail-label">
-                        <span class="status-badge status-{status}">{status.title()}</span>
-                    </span>
-                    <span class="detail-value">{status_data['count']} (HK${status_data['amount']:,.2f})</span>
-                </div>
-                '''
-            
-            html += '</div>'
-        
-        if not accounts_data:
-            html += '''
-            <div style="text-align: center; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
-                <h3 style="color: #64748b; margin-bottom: 16px;">📊 No Data Available</h3>
-                <p style="color: #64748b;">No transaction data found. Please sync your Stripe data first.</p>
-                <p style="margin-top: 16px;"><a href="/" style="color: #4f46e5;">← Return to Home</a></p>
-            </div>
-            '''
-        
-        html += f'''
-                </div>
-            </div>
-            
-            <script>
-                Chart.defaults.responsive = true;
-                Chart.defaults.maintainAspectRatio = false;
-                
-                const accountsData = {chart_data};
-                
-                // Only create charts if we have data
-                if (accountsData.length > 0) {{
-                    // Revenue Chart
-                    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-                    new Chart(revenueCtx, {{
-                        type: 'doughnut',
-                        data: {{
-                            labels: accountsData.map(acc => acc.name),
-                            datasets: [{{
-                                data: accountsData.map(acc => acc.total_amount),
-                                backgroundColor: [
-                                    '#4f46e5', '#06b6d4', '#10b981', '#f59e0b', 
-                                    '#ef4444', '#8b5cf6', '#f97316'
-                                ],
-                                borderWidth: 3,
-                                borderColor: '#fff',
-                                hoverBorderWidth: 4
-                            }}]
-                        }},
-                        options: {{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {{
-                                legend: {{
-                                    position: 'bottom',
-                                    labels: {{
-                                        padding: 20,
-                                        usePointStyle: true,
-                                        font: {{ size: 12 }}
-                                    }}
-                                }},
-                                tooltip: {{
-                                    callbacks: {{
-                                        label: function(context) {{
-                                            const label = context.label || '';
-                                            const value = context.parsed;
-                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                            const percentage = ((value / total) * 100).toFixed(1);
-                                            return `${{label}}: HK${{value.toLocaleString()}} (${{percentage}}%)`;
-                                        }}
-                                    }}
-                                }}
-                            }}
-                        }}
-                    }});
-                    
-                    // Transaction Count Chart
-                    const transactionCtx = document.getElementById('transactionChart').getContext('2d');
-                    new Chart(transactionCtx, {{
-                        type: 'bar',
-                        data: {{
-                            labels: accountsData.map(acc => acc.name),
-                            datasets: [{{
-                                label: 'Transactions',
-                                data: accountsData.map(acc => acc.total_count),
-                                backgroundColor: '#4f46e5',
-                                borderColor: '#4338ca',
-                                borderWidth: 2,
-                                borderRadius: 6,
-                                borderSkipped: false,
-                            }}]
-                        }},
-                        options: {{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {{
-                                y: {{
-                                    beginAtZero: true,
-                                    grid: {{ color: '#f1f5f9' }},
-                                    ticks: {{ font: {{ size: 12 }} }}
-                                }},
-                                x: {{
-                                    grid: {{ display: false }},
-                                    ticks: {{ font: {{ size: 12 }} }}
-                                }}
-                            }},
-                            plugins: {{
-                                legend: {{ display: false }},
-                                tooltip: {{
-                                    callbacks: {{
-                                        label: function(context) {{
-                                            return `Transactions: ${{context.parsed.y.toLocaleString()}}`;
-                                        }}
-                                    }}
-                                }}
-                            }}
-                        }}
-                    }});
-                }} else {{
-                    // Show message if no data
-                    document.getElementById('revenueChart').style.display = 'none';
-                    document.getElementById('transactionChart').style.display = 'none';
-                }}
-                
-                // Auto-refresh every 5 minutes
-                setTimeout(() => location.reload(), 300000);
-            </script>
-        </body>
-        </html>
-        '''
-        
-        return html
-        
-    except Exception as e:
-        return f'''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Dashboard Error</title>
-            <style>
-                body {{ font-family: sans-serif; margin: 40px; background: #fef2f2; }}
-                .error {{ background: white; padding: 30px; border-radius: 8px; border-left: 4px solid #ef4444; }}
-                .error h1 {{ color: #dc2626; margin-bottom: 16px; }}
-                .error-details {{ background: #f9fafb; padding: 16px; border-radius: 6px; margin: 16px 0; }}
-                .nav {{ margin-top: 20px; }}
-                .nav a {{ margin-right: 15px; color: #4f46e5; text-decoration: none; }}
-            </style>
-        </head>
-        <body>
-            <div class="error">
-                <h1>❌ Dashboard Error</h1>
-                <p>There was an error loading the analytics dashboard.</p>
-                <div class="error-details">
-                    <strong>Error details:</strong><br>
-                    {str(e)}
-                </div>
-                <div class="nav">
-                    <a href="/">← Back to Home</a>
-                    <a href="/analytics/simple">📋 Try Simple View</a>
-                    <a href="/analytics/summary">📈 Try Summary</a>
-                </div>
-            </div>
-        </body>
-        </html>
-        '''
 
 @analytics_bp.route('/statement-generator')
 def statement_generator():
@@ -1447,12 +859,10 @@ def statement_generator():
                 
                 <div class="navigation">
                     <a href="/" class="nav-link">🏠 Home</a>
-                    <a href="/analytics/dashboard" class="nav-link">📊 Dashboard</a>
-                    <a href="/analytics/simple" class="nav-link">📋 Simple View</a>
+                        <a href="/analytics/simple" class="nav-link">📋 Simple View</a>
                     <a href="/analytics/statement-generator" class="nav-link">📄 Statement Generator</a>
                     <a href="/analytics/api/account-amounts" class="nav-link">🔗 API Data</a>
-                    <a href="/analytics/summary" class="nav-link">📈 Summary</a>
-                </div>
+                    </div>
                 
                 <div class="info-card">
                     <h3>📋 Statement Generator</h3>
@@ -1550,8 +960,8 @@ def statement_generator():
                         <button type="button" class="btn btn-primary" onclick="generateStatement()">
                             📄 Generate Statement
                         </button>
-                        <button type="button" class="btn btn-secondary" onclick="window.location.href='/analytics/summary'">
-                            📈 View Summary Instead
+                        <button type="button" class="btn btn-secondary" onclick="window.location.href='/analytics/simple'">
+                            📋 View Simple Dashboard
                         </button>
                     </div>
                 </div>
@@ -1560,9 +970,8 @@ def statement_generator():
                     <h3 style="color: #64748b; margin-bottom: 16px;">� Statement Generation</h3>
                     <p style="color: #64748b;">Select your options above and click "Generate Statement" to create a custom report.</p>
                     <div style="margin-top: 20px;">
-                        <a href="/analytics/dashboard" style="margin-right: 15px; color: #4f46e5; text-decoration: none;">📊 Dashboard</a>
                         <a href="/analytics/simple" style="margin-right: 15px; color: #4f46e5; text-decoration: none;">📋 Simple View</a>
-                        <a href="/analytics/summary" style="color: #4f46e5; text-decoration: none;">📈 Summary</a>
+                        <a href="/analytics/api/account-amounts" style="color: #4f46e5; text-decoration: none;">🔗 API Data</a>
                     </div>
                 </div>
             </div>
@@ -1698,7 +1107,6 @@ def statement_generator():
                 <div class="nav">
                     <a href="/">← Back to Home</a>
                     <a href="/analytics/simple">📋 Try Simple View</a>
-                    <a href="/analytics/summary">📈 Try Summary</a>
                 </div>
             </div>
         </body>
@@ -1898,8 +1306,8 @@ def generate_statement():
                 </div>
                 <div class="nav">
                     <a href="/analytics/statement-generator">← Back to Statement Generator</a>
-                    <a href="/analytics/dashboard">📊 Dashboard</a>
-                    <a href="/analytics/summary">📈 Summary</a>
+                    <a href="/analytics/simple">📋 Simple View</a>
+                    <a href="/analytics/api/account-amounts">🔗 API Data</a>
                 </div>
             </div>
         </body>
@@ -2193,8 +1601,6 @@ def generate_detailed_statement(transactions, status_counts, total_amount, total
             
             <div class="navigation no-print">
                 <a href="/analytics/statement-generator" class="nav-link">📄 New Statement</a>
-                <a href="/analytics/dashboard" class="nav-link">📊 Dashboard</a>
-                <a href="/analytics/summary" class="nav-link">📈 Summary</a>
                 <a href="/" class="nav-link">🏠 Home</a>
             </div>
             

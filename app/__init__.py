@@ -22,13 +22,18 @@ def create_app():
         # Use environment variable if provided (production/Docker)
         app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
     else:
-        # Default to relative path for development
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/payments.db'
+        # Use absolute path for development to ensure consistent database access
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////Users/wongivan/stripe-dashboard/instance/payments.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Initialize extensions
-    db.init_app(app)
-    migrate.init_app(app, db)
+    try:
+        db.init_app(app)
+        migrate.init_app(app, db)
+    except Exception as db_init_error:
+        print(f"Database Initialization Error: {db_init_error}")
+        print(f"Database URI: {app.config['SQLALCHEMY_DATABASE_URI']}")
+        raise
     
     # Import models (important to do this before registering blueprints)
     from app.models import StripeAccount, Transaction
@@ -95,12 +100,6 @@ def create_app():
                 </div>
                 
                 <div class="nav-grid">
-                    <a href="/analytics/dashboard" class="nav-item">
-                        <div class="nav-icon">📊</div>
-                        <div class="nav-title">Analytics Dashboard</div>
-                        <div class="nav-desc">Interactive charts and comprehensive analytics with real-time data visualization</div>
-                    </a>
-                    
                     <a href="/analytics/simple" class="nav-item">
                         <div class="nav-icon">📋</div>
                         <div class="nav-title">Simple Dashboard</div>
@@ -117,12 +116,6 @@ def create_app():
                         <div class="nav-icon">🔗</div>
                         <div class="nav-title">API Data</div>
                         <div class="nav-desc">JSON API endpoint for programmatic access to account data</div>
-                    </a>
-                    
-                    <a href="/analytics/summary" class="nav-item">
-                        <div class="nav-icon">📈</div>
-                        <div class="nav-title">Quick Summary</div>
-                        <div class="nav-desc">Fast overview of all accounts and their current status</div>
                     </a>
                 </div>
                 
@@ -377,42 +370,6 @@ def create_app():
                 )
                 return response
 
-        @app.route('/analytics/summary')
-        def fallback_summary():
-            """Quick account summary endpoint"""
-            try:
-                accounts = StripeAccount.query.all()
-                
-                summary = []
-                for account in accounts:
-                    total_transactions = Transaction.query.filter_by(account_id=account.id).count()
-                    
-                    from sqlalchemy import func
-                    total_amount = db.session.query(func.sum(Transaction.amount))\
-                                           .filter_by(account_id=account.id)\
-                                           .scalar() or 0
-                    
-                    summary.append({
-                        'name': account.name,
-                        'account_id': account.account_id,
-                        'transactions': total_transactions,
-                        'total_amount_hkd': total_amount / 100,
-                        'is_active': account.is_active
-                    })
-                
-                return jsonify({
-                    'success': True,
-                    'timestamp': datetime.now().isoformat(),
-                    'accounts': summary,
-                    'total_accounts': len(summary)
-                })
-                
-            except Exception as e:
-                return jsonify({
-                    'success': False,
-                    'error': str(e),
-                    'timestamp': datetime.now().isoformat()
-                }), 500
 
         # Fallback analytics routes created
     
