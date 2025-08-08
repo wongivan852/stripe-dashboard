@@ -4,9 +4,44 @@ flask.log
 app.log
 *.tmp
 
-# Environment
+# Environment files
+.env
 .env.local
+.env.production
 
 # Python cache
 __pycache__/
 *.pyc
+
+# System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Database files (development)
+instance/
+*.db
+
+# Temporary import scripts
+import_*.py
+
+# PDF reports and temporary files
+*.pdf
+stripe_report_*.txt
+
+# Validation and temporary scripts
+validate_*.py
+
+# Claude AI workspace
+.claude/
