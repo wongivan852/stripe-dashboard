@@ -230,7 +230,14 @@ For support and questions:
 
 ## 🔄 Changelog
 
-### v1.0.0 (Production Release)
+### v2.0.0 (Production Integration Release)
+- ✅ **CGGE July 2025 Data Correction** - Matches exact Stripe dashboard figures
+- ✅ **Root Cause Analysis** for data discrepancies identified and resolved
+- ✅ **Production CRM Integration** with automated reconciliation
+- ✅ **Enhanced Financial Reporting** with corrected calculations
+- ✅ **Data Validation** for CSV imports with error handling
+
+### v1.0.0 (Initial Production Release)
 - ✅ Multi-company Stripe analytics
 - ✅ Currency conversion support (CNY/HKD)
 - ✅ Advanced filtering and reporting

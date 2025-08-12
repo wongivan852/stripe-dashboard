@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Export & Print Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .btn { padding: 12px 24px; margin: 10px; background: #4f46e5; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .btn:hover { background: #4338ca; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Export & Print Functionality Test</h1>
+    
+    <div>
+        <button class="btn" onclick="testExportCSV()">📊 Test Export CSV</button>
+        <button class="btn" onclick="testOptimizeForPrint()">📄 Test Optimize for Print</button>
+        <button class="btn" onclick="window.print()">🖨️ Test Print</button>
+    </div>
+    
+    <h2>Sample Data</h2>
+    <table id="sampleTable">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Company</th>
+                <th>Amount</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>2025-07-31</td>
+                <td>CGGE</td>
+                <td>HK$96.20</td>
+                <td>Succeeded</td>
+            </tr>
+            <tr>
+                <td>2025-07-30</td>
+                <td>CGGE</td>
+                <td>HK$96.53</td>
+                <td>Succeeded</td>
+            </tr>
+            <tr>
+                <td>2025-07-29</td>
+                <td>CGGE</td>
+                <td>HK$96.58</td>
+                <td>Succeeded</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <script>
+        function testExportCSV() {
+            const transactions = [
+                {
+                    date: "2025-07-31 19:07",
+                    company: "CGGE",
+                    description: "Test transaction 1",
+                    type: "charge",
+                    status: "succeeded",
+                    amount: 96.20,
+                    fee: 4.12,
+                    net: 92.08,
+                    customer: "test@example.com"
+                },
+                {
+                    date: "2025-07-30 15:30",
+                    company: "CGGE", 
+                    description: "Test transaction 2",
+                    type: "charge",
+                    status: "succeeded",
+                    amount: 96.53,
+                    fee: 4.12,
+                    net: 92.41,
+                    customer: "test2@example.com"
+                }
+            ];
+            
+            try {
+                let csvContent = "Date,Company,Description,Type,Status,Gross Amount (HKD),Fee (HKD),Net Amount (HKD),Customer Email\\n";
+                
+                transactions.forEach(tx => {
+                    const escapeCSV = (val) => {
+                        if (val === null || val === undefined) return '';
+                        const str = String(val);
+                        if (str.includes(',') || str.includes('"') || str.includes('\\n')) {
+                            return '"' + str.replace(/"/g, '""') + '"';
+                        }
+                        return str;
+                    };
+                    
+                    csvContent += [
+                        escapeCSV(tx.date),
+                        escapeCSV(tx.company),
+                        escapeCSV(tx.description),
+                        escapeCSV(tx.type),
+                        escapeCSV(tx.status),
+                        tx.amount.toFixed(2),
+                        tx.fee.toFixed(2),
+                        tx.net.toFixed(2),
+                        escapeCSV(tx.customer)
+                    ].join(',') + '\\n';
+                });
+                
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `test_export_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                alert('✅ CSV export test successful!');
+                
+            } catch (error) {
+                console.error('CSV Export Error:', error);
+                alert('❌ CSV export test failed: ' + error.message);
+            }
+        }
+        
+        function testOptimizeForPrint() {
+            try {
+                // Test print optimization
+                document.body.style.fontSize = '11px';
+                document.body.style.lineHeight = '1.3';
+                
+                const table = document.getElementById('sampleTable');
+                if (table) {
+                    table.style.fontSize = '10px';
+                    table.style.width = '100%';
+                }
+                
+                // Add test print CSS
+                const style = document.createElement('style');
+                style.innerHTML = `
+                    @media print {
+                        body { font-size: 10px !important; }
+                        table { font-size: 9px !important; }
+                        .btn { display: none !important; }
+                    }
+                `;
+                document.head.appendChild(style);
+                
+                alert('✅ Print optimization test successful! Layout optimized. Now try printing with Ctrl+P.');
+                
+            } catch (error) {
+                console.error('Print Optimization Error:', error);
+                alert('❌ Print optimization test failed: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
