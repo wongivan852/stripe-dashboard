@@ -261,7 +261,7 @@ For support and questions:
 
 ## 🔄 Changelog
 
-### v1.2.0 (December 2025) - Balance Reconciliation & Date Analysis
+### v2.1.0 (December 2025) - Balance Reconciliation & Date Analysis
 - ✅ **Fixed balance carry-forward between months** - November 2021 → December 2021 continuity restored
 - ✅ **Enhanced date field handling** - Created vs Available On date analysis for optimal reconciliation
 - ✅ **Dual reconciliation methods** - Monthly statements (Created dates) + Payout reconciliation (Transfer dates)
@@ -269,13 +269,20 @@ For support and questions:
 - ✅ **Manual reconciliation optimization** - Perfect alignment with Stripe's official payout reports
 - ✅ **July 2025 balance verification** - Maintains correct closing balance of HK$554.77
 
+### v2.0.0 (Production Integration Release)
+- ✅ **CGGE July 2025 Data Correction** - Matches exact Stripe dashboard figures
+- ✅ **Root Cause Analysis** for data discrepancies identified and resolved
+- ✅ **Production CRM Integration** with automated reconciliation
+- ✅ **Enhanced Financial Reporting** with corrected calculations
+- ✅ **Data Validation** for CSV imports with error handling
+
 ### v1.1.0 (Previous Updates)
 - ✅ Complete CSV processing with transfer date support
 - ✅ Payout reconciliation matching Stripe reports exactly
 - ✅ Enhanced transaction categorization (gross, fees, payouts)
 - ✅ Interactive web interfaces for statement generation
 
-### v1.0.0 (Production Release)
+### v1.0.0 (Initial Production Release)
 - ✅ Multi-company Stripe analytics
 - ✅ Currency conversion support (CNY/HKD)
 - ✅ Advanced filtering and reporting

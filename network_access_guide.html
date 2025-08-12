@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Access Guide - Stripe Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        .header {
+            background: linear-gradient(45deg, #1e3c72, #2a5298);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        .content {
+            padding: 40px;
+        }
+        .section {
+            margin-bottom: 40px;
+            padding: 30px;
+            border-radius: 12px;
+            border-left: 4px solid;
+        }
+        .success { background: #f0f9ff; border-left-color: #10b981; }
+        .info { background: #fef3c7; border-left-color: #f59e0b; }
+        .error { background: #fef2f2; border-left-color: #ef4444; }
+        .url-box {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            font-size: 1.1rem;
+            word-break: break-all;
+        }
+        .test-links {
+            display: grid;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .test-link {
+            display: block;
+            background: #059669;
+            color: white;
+            text-decoration: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .test-link:hover {
+            background: #047857;
+            transform: translateY(-2px);
+        }
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+        .step-number {
+            background: #3b82f6;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .checklist li:before {
+            content: "✅ ";
+            margin-right: 10px;
+        }
+        .ip-info {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌐 Network Access Guide</h1>
+            <p>Stripe Dashboard Remote Access Setup</p>
+        </div>
+        
+        <div class="content">
+            <div class="section success">
+                <h2>✅ Server Status</h2>
+                <p><strong>Your Stripe Dashboard is running and accessible from remote devices!</strong></p>
+                <ul class="checklist">
+                    <li>Server bound to all network interfaces (0.0.0.0)</li>
+                    <li>Running on port 9001</li>
+                    <li>Firewall is not blocking connections</li>
+                    <li>Network IP detected: <strong>192.168.0.104</strong></li>
+                </ul>
+            </div>
+
+            <div class="section info">
+                <h2>📱 Access from Remote Devices</h2>
+                <p>Use these URLs to access your dashboard from other devices on the same network:</p>
+                
+                <h3>Main Dashboard:</h3>
+                <div class="url-box">http://192.168.0.104:9001</div>
+                
+                <h3>Analytics (Simple View):</h3>
+                <div class="url-box">http://192.168.0.104:9001/analytics/simple</div>
+                
+                <h3>Statement Generator:</h3>
+                <div class="url-box">http://192.168.0.104:9001/analytics/statement-generator</div>
+                
+                <h3>Individual Transactions (CGGE):</h3>
+                <div class="url-box">http://192.168.0.104:9001/analytics/statement-generator/generate?company=1&period=365&status=all&format=detailed</div>
+                
+                <div class="test-links">
+                    <a href="http://192.168.0.104:9001" class="test-link" target="_blank">Test Main Dashboard</a>
+                    <a href="http://192.168.0.104:9001/analytics/simple" class="test-link" target="_blank">Test Analytics</a>
+                    <a href="http://192.168.0.104:9001/analytics/statement-generator/generate?company=1&period=365&status=all&format=detailed" class="test-link" target="_blank">Test Transaction Details</a>
+                </div>
+            </div>
+
+            <div class="section info">
+                <h2>📋 Troubleshooting Steps</h2>
+                
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div>
+                        <h3>Check Network Connection</h3>
+                        <p>Ensure both devices are on the same WiFi network or local network.</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div>
+                        <h3>Find Your IP Address</h3>
+                        <p>If the IP changed, run this command to get the current IP:</p>
+                        <div class="url-box">ip addr show | grep "inet 192"</div>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div>
+                        <h3>Test Local Access First</h3>
+                        <p>On this computer, test: <code>http://192.168.0.104:9001</code></p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div>
+                        <h3>Check Mobile Device</h3>
+                        <p>On your mobile device or other computer, open a web browser and navigate to:</p>
+                        <div class="url-box">http://192.168.0.104:9001</div>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div>
+                        <h3>Router/Network Issues</h3>
+                        <p>If still not working, check:</p>
+                        <ul style="margin-top: 10px;">
+                            <li>Router firewall settings</li>
+                            <li>AP isolation (guest network restrictions)</li>
+                            <li>Port forwarding (not usually needed for local network)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ip-info">
+                <h3>🔧 Current Network Information</h3>
+                <p><strong>Server Host:</strong> 192.168.0.104</p>
+                <p><strong>Server Port:</strong> 9001</p>
+                <p><strong>Binding:</strong> 0.0.0.0 (all interfaces)</p>
+                <p><strong>Status:</strong> ✅ Active and accessible</p>
+                <p><strong>Firewall:</strong> ✅ Not blocking (inactive)</p>
+            </div>
+
+            <div class="section error">
+                <h2>🚨 Still Not Working?</h2>
+                <p>If remote devices still can't access the dashboard:</p>
+                <ol style="margin: 15px 0; padding-left: 20px;">
+                    <li>Restart the server: <code>python test_app.py</code></li>
+                    <li>Check if IP address changed</li>
+                    <li>Try disabling Windows/Mac firewall temporarily</li>
+                    <li>Test with a different device or network</li>
+                    <li>Check router's AP isolation settings</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
