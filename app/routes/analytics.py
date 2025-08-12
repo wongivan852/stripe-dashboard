@@ -4,6 +4,7 @@ from app.models import StripeAccount, Transaction
 from sqlalchemy import func, text
 from datetime import datetime, timedelta
 from app.services.csv_transaction_service import CSVTransactionService
+from app.services.complete_csv_service import CompleteCsvService
 import json
 import csv
 import io
@@ -2359,6 +2360,510 @@ def debug_statement_generation():
         })
         
     except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+# Monthly Statement Routes
+@analytics_bp.route('/monthly-statement')
+def monthly_statement():
+    """Monthly statement generator interface"""
+    try:
+        csv_service = CompleteCsvService()
+        companies = csv_service.get_available_companies()
+        available_months = csv_service.get_available_months()
+        
+        return render_template_string("""
+        <\!DOCTYPE html>
+        <html>
+        <head>
+            <title>Company Stripe Dashboard - Monthly Statement</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+                body { 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                    background: #f8fafc; color: #334155; line-height: 1.6;
+                }
+                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                .header { 
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    color: white; padding: 2rem; text-align: center; border-radius: 12px; 
+                    margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                }
+                .navigation {
+                    display: flex; justify-content: center; gap: 15px; margin: 20px 0; padding: 20px;
+                    background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+                    flex-wrap: wrap;
+                }
+                .nav-link {
+                    padding: 12px 24px; background: #4f46e5; color: white; text-decoration: none;
+                    border-radius: 8px; transition: all 0.2s; font-weight: 500;
+                }
+                .nav-link:hover { background: #4338ca; transform: translateY(-1px); }
+                .form-container {
+                    background: white; padding: 32px; border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 24px;
+                }
+                .form-grid {
+                    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                    gap: 24px; margin-bottom: 24px;
+                }
+                .form-group { display: flex; flex-direction: column; gap: 8px; }
+                .form-label { font-weight: 600; color: #374151; font-size: 0.95rem; }
+                .form-select, .form-input {
+                    padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                    font-size: 1rem; transition: border-color 0.2s;
+                }
+                .form-select:focus, .form-input:focus {
+                    outline: none; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+                }
+                .btn-group {
+                    display: flex; gap: 12px; justify-content: center; margin-top: 24px;
+                    flex-wrap: wrap;
+                }
+                .btn {
+                    padding: 14px 28px; border: none; border-radius: 8px; cursor: pointer;
+                    font-weight: 600; font-size: 1rem; transition: all 0.2s;
+                    display: flex; align-items: center; gap: 8px;
+                }
+                .btn-primary { background: #4f46e5; color: white; }
+                .btn-primary:hover { background: #4338ca; transform: translateY(-1px); }
+                .btn-secondary { background: #6b7280; color: white; }
+                .btn-secondary:hover { background: #4b5563; }
+                .results-container {
+                    background: white; border-radius: 12px; 
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.08); padding: 24px;
+                    margin-top: 24px; display: none;
+                }
+                .statement-table {
+                    width: 100%; border-collapse: collapse; margin-top: 20px;
+                }
+                .statement-table th, .statement-table td {
+                    padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb;
+                }
+                .statement-table th {
+                    background: #f8fafc; font-weight: 600; color: #374151;
+                }
+                .debit { color: #dc2626; }
+                .credit { color: #059669; }
+                .balance { font-weight: 600; }
+                .summary-card {
+                    background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px;
+                    padding: 20px; margin-bottom: 20px; color: #0c4a6e;
+                }
+                @media print {
+                    .navigation, .form-container, .btn-group { display: none; }
+                    .container { max-width: none; margin: 0; padding: 0; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>📄 Monthly Statement Generator</h1>
+                    <p>Generate consolidated monthly statements with running balance</p>
+                </div>
+                
+                <div class="navigation">
+                    <a href="/" class="nav-link">🏠 Home</a>
+                    <a href="/analytics/simple" class="nav-link">📋 Simple View</a>
+                    <a href="/analytics/statement-generator" class="nav-link">📄 Statement Generator</a>
+                    <a href="/analytics/monthly-statement" class="nav-link">📅 Monthly Statement</a>
+                </div>
+                
+                <div class="form-container">
+                    <h2>📋 Generate Monthly Statement</h2>
+                    <p>Create a detailed monthly statement with opening/closing balance carry-forward</p>
+                    
+                    <form id="statementForm">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label class="form-label">Company</label>
+                                <select class="form-select" name="company" id="company">
+                                    <option value="">All Companies</option>
+                                    {% for company in companies %}
+                                    <option value="{{ company.code }}">{{ company.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Year</label>
+                                <select class="form-select" name="year" id="year" required>
+                                    {% for year in range(2021, 2026) %}
+                                    <option value="{{ year }}" {% if year == 2025 %}selected{% endif %}>{{ year }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Month</label>
+                                <select class="form-select" name="month" id="month" required>
+                                    <option value="1">January</option>
+                                    <option value="2">February</option>
+                                    <option value="3">March</option>
+                                    <option value="4">April</option>
+                                    <option value="5">May</option>
+                                    <option value="6">June</option>
+                                    <option value="7" selected>July</option>
+                                    <option value="8">August</option>
+                                    <option value="9">September</option>
+                                    <option value="10">October</option>
+                                    <option value="11">November</option>
+                                    <option value="12">December</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Previous Balance (HKD)</label>
+                                <input type="number" step="0.01" class="form-input" name="previous_balance" id="previous_balance" value="0" placeholder="0 = Auto-calculate from previous month">
+                                <small style="color: #64748b; font-size: 0.85rem;">Leave at 0 for automatic carry-forward calculation</small>
+                            </div>
+                        </div>
+                        
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary">
+                                📄 Generate Statement
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="exportCSV()">
+                                💾 Export CSV
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="window.print()">
+                                🖨️ Print
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="results-container" id="resultsContainer">
+                    <\!-- Statement results will be displayed here -->
+                </div>
+            </div>
+            
+            <script>
+                let currentStatementData = null;
+                
+                document.getElementById('statementForm').addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    generateStatement();
+                });
+                
+                async function generateStatement() {
+                    const formData = new FormData(document.getElementById('statementForm'));
+                    const params = new URLSearchParams();
+                    
+                    // Add form parameters, but handle previous_balance specially
+                    for (const [key, value] of formData.entries()) {
+                        if (key === 'previous_balance') {
+                            // Only include previous_balance if user has entered a non-zero value
+                            // This allows automatic carry-forward calculation when left at 0
+                            const prevBalance = parseFloat(value) || 0;
+                            if (prevBalance !== 0) {
+                                params.append(key, value);
+                            }
+                        } else {
+                            params.append(key, value);
+                        }
+                    }
+                    
+                    console.log('Generating statement with params:', params.toString());
+                    
+                    try {
+                        const response = await fetch('/analytics/api/monthly-statement?' + params.toString());
+                        console.log('API Response status:', response.status);
+                        
+                        const data = await response.json();
+                        console.log('API Response data:', data);
+                        
+                        if (data.success) {
+                            console.log('Statement generated successfully:', data.statement);
+                            currentStatementData = data.statement;
+                            displayStatement(data.statement);
+                        } else {
+                            console.error('API returned error:', data.error);
+                            alert('Error generating statement: ' + data.error);
+                        }
+                    } catch (error) {
+                        console.error('JavaScript error:', error);
+                        alert('Error: ' + error.message);
+                    }
+                }
+                
+                function displayStatement(statement) {
+                    console.log('displayStatement called with:', statement);
+                    const container = document.getElementById('resultsContainer');
+                    console.log('Results container found:', container);
+                    const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+                                      'July', 'August', 'September', 'October', 'November', 'December'];
+                    
+                    let html = `
+                        <div class="summary-card">
+                            <h3>Statement Summary for ${monthNames[statement.month]} ${statement.year}</h3>
+                            <p><strong>Company:</strong> ${statement.company_filter || 'All Companies'}</p>
+                            <p><strong>Opening Balance:</strong> HK$${statement.opening_balance.toFixed(2)}</p>
+                            <p><strong>Closing Balance:</strong> HK$${statement.closing_balance.toFixed(2)}</p>
+                            <p><strong>Total Transactions:</strong> ${statement.transactions.length}</p>
+                        </div>
+                        
+                        <table class="statement-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Nature</th>
+                                    <th>Party</th>
+                                    <th>Debit</th>
+                                    <th>Credit</th>
+                                    <th>Balance</th>
+                                    <th>Acknowledged</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="background: #f0f9ff;">
+                                    <td>${statement.year}-${statement.month.toString().padStart(2, '0')}-01</td>
+                                    <td>Opening Balance</td>
+                                    <td>Brought Forward</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td class="balance">HK$${statement.opening_balance.toFixed(2)}</td>
+                                    <td>Yes</td>
+                                    <td>Opening balance for ${monthNames[statement.month]} ${statement.year}</td>
+                                </tr>
+                    `;
+                    
+                    statement.transactions.forEach(tx => {
+                        html += `
+                            <tr>
+                                <td>${tx.date}</td>
+                                <td>${tx.nature}</td>
+                                <td>${tx.party}</td>
+                                <td class="debit">${parseFloat(tx.debit) > 0 ? 'HK$' + parseFloat(tx.debit).toFixed(2) : ''}</td>
+                                <td class="credit">${parseFloat(tx.credit) > 0 ? 'HK$' + parseFloat(tx.credit).toFixed(2) : ''}</td>
+                                <td class="balance">HK$${parseFloat(tx.balance).toFixed(2)}</td>
+                                <td>${tx.acknowledged ? 'Yes' : 'No'}</td>
+                                <td>${tx.description}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    // Calculate subtotals - show net effect
+                    let grossDebit = 0;
+                    let feeDebit = 0;
+                    let totalCredit = 0;
+                    
+                    statement.transactions.forEach(tx => {
+                        if (tx.is_fee) {
+                            feeDebit += parseFloat(tx.debit) || 0;
+                        } else {
+                            grossDebit += parseFloat(tx.debit) || 0;
+                        }
+                        totalCredit += parseFloat(tx.credit) || 0;
+                    });
+                    
+                    const netDebit = grossDebit - feeDebit;
+                    
+                    // Add subtotal row
+                    html += `
+                                <tr style="background: #fff7ed; border-top: 2px solid #f59e0b;">
+                                    <td colspan="3"><strong>SUBTOTAL</strong></td>
+                                    <td class="debit" style="font-weight: bold;">HK$${netDebit.toFixed(2)}</td>
+                                    <td class="credit" style="font-weight: bold;">HK$${totalCredit.toFixed(2)}</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                </tr>
+                    `;
+                    
+                    const lastDay = new Date(statement.year, statement.month, 0).getDate();
+                    html += `
+                                <tr style="background: #f0f9ff;">
+                                    <td>${statement.year}-${statement.month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}</td>
+                                    <td>Closing Balance</td>
+                                    <td>Carry Forward</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td class="balance">HK$${statement.closing_balance.toFixed(2)}</td>
+                                    <td>Yes</td>
+                                    <td>Closing balance for ${monthNames[statement.month]} ${statement.year}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    container.innerHTML = html;
+                    container.style.display = 'block';
+                    console.log('Statement displayed successfully, container is now visible');
+                }
+                
+                async function exportCSV() {
+                    if (!currentStatementData) {
+                        alert('Please generate a statement first');
+                        return;
+                    }
+                    
+                    const formData = new FormData(document.getElementById('statementForm'));
+                    const params = new URLSearchParams();
+                    
+                    // Add form parameters, but handle previous_balance specially
+                    for (const [key, value] of formData.entries()) {
+                        if (key === 'previous_balance') {
+                            // Only include previous_balance if user has entered a non-zero value
+                            const prevBalance = parseFloat(value) || 0;
+                            if (prevBalance !== 0) {
+                                params.append(key, value);
+                            }
+                        } else {
+                            params.append(key, value);
+                        }
+                    }
+                    
+                    try {
+                        const response = await fetch('/analytics/api/monthly-statement-csv?' + params.toString());
+                        const blob = await response.blob();
+                        
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `monthly_statement_${currentStatementData.year}_${currentStatementData.month.toString().padStart(2, '0')}.csv`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                    } catch (error) {
+                        alert('Error exporting CSV: ' + error.message);
+                    }
+                }
+            </script>
+        </body>
+        </html>
+        """, companies=companies, available_months=available_months)
+        
+    except Exception as e:
+        logger.error(f"Error in monthly statement route: {e}")
+        return f"Error: {str(e)}", 500
+
+@analytics_bp.route('/api/monthly-statement')
+def api_monthly_statement():
+    """API endpoint to generate monthly statement data"""
+    try:
+        csv_service = CompleteCsvService()
+        
+        # Get parameters
+        company = request.args.get('company', '')
+        year = int(request.args.get('year', 2025))
+        month = int(request.args.get('month', 7))
+        previous_balance_param = request.args.get('previous_balance')
+        
+        # If previous_balance is provided and not empty, use it; otherwise let the service calculate it
+        if previous_balance_param and previous_balance_param.strip():
+            previous_balance = float(previous_balance_param)
+        else:
+            previous_balance = None
+        
+        # Generate statement
+        statement = csv_service.generate_monthly_statement(
+            year=year,
+            month=month,
+            company_filter=company if company else None,
+            previous_balance=previous_balance
+        )
+        
+        # Format dates for frontend
+        for tx in statement['transactions']:
+            if tx.get('date'):
+                tx['date'] = tx['date'].strftime('%Y-%m-%d') if hasattr(tx['date'], 'strftime') else str(tx['date'])
+        
+        return jsonify({
+            'success': True,
+            'statement': statement
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating monthly statement: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@analytics_bp.route('/api/monthly-statement-csv')
+def api_monthly_statement_csv():
+    """API endpoint to export monthly statement as CSV"""
+    try:
+        csv_service = CompleteCsvService()
+        
+        # Get parameters
+        company = request.args.get('company', '')
+        year = int(request.args.get('year', 2025))
+        month = int(request.args.get('month', 7))
+        previous_balance_param = request.args.get('previous_balance')
+        
+        # If previous_balance is provided and not empty, use it; otherwise let the service calculate it
+        if previous_balance_param and previous_balance_param.strip():
+            previous_balance = float(previous_balance_param)
+        else:
+            previous_balance = None
+        
+        # Generate statement
+        statement = csv_service.generate_monthly_statement(
+            year=year,
+            month=month,
+            company_filter=company if company else None,
+            previous_balance=previous_balance
+        )
+        
+        # Export to CSV
+        csv_content = csv_service.export_monthly_statement_csv(statement)
+        
+        if csv_content:
+            filename = f"monthly_statement_{year}_{month:02d}.csv"
+            
+            return Response(
+                csv_content,
+                mimetype='text/csv',
+                headers={
+                    'Content-Disposition': f'attachment; filename={filename}',
+                    'Content-Type': 'text/csv; charset=utf-8'
+                }
+            )
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to generate CSV'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error exporting monthly statement CSV: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@analytics_bp.route('/api/payout-reconciliation')
+def api_payout_reconciliation():
+    """API endpoint to generate payout reconciliation data (matches Stripe's format)"""
+    try:
+        csv_service = CompleteCsvService()
+        
+        # Get parameters
+        company = request.args.get('company', '')
+        year = int(request.args.get('year', 2025))
+        month = int(request.args.get('month', 7))
+        
+        # Generate payout reconciliation
+        reconciliation = csv_service.generate_payout_reconciliation(
+            year=year,
+            month=month,
+            company_filter=company if company else None
+        )
+        
+        return jsonify({
+            'success': True,
+            'reconciliation': reconciliation
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating payout reconciliation: {e}")
         return jsonify({
             'success': False,
             'error': str(e)

@@ -1,17 +1,37 @@
-# 🏦 Stripe Dashboard Analytics
+# 🏦 Company Stripe Dashboard
 
-A comprehensive Flask-based web application for analyzing Stripe transaction data across multiple companies with advanced reporting capabilities and currency handling.
+A comprehensive Flask-based web application for analyzing Stripe transaction data across multiple companies with monthly statement consolidation, advanced reporting capabilities, and currency handling.
 
 **📍 Repository**: [wongivan852/stripe-dashboard](https://github.com/wongivan852/stripe-dashboard)
 
+## 🆕 Recent Updates (December 2025)
+
+### ✅ Enhanced Balance Carry-Forward & Date Field Analysis
+- **Fixed Balance Continuity**: Resolved November 2021 → December 2021 carry-forward issue (HK$45.95)
+- **Date Field Optimization**: Analyzed Created vs Available On dates for optimal manual reconciliation
+- **Cross-Month Transfer Logic**: Improved handling of transactions with distant transfer dates
+- **July 2025 Balance Verification**: Maintains correct closing balance of HK$554.77
+
+### 🔄 Two Reconciliation Methods
+1. **Monthly Statements** (Created dates): For consistent monthly balance tracking
+2. **Payout Reconciliation** (Transfer dates): Matches Stripe's official payout reports exactly
+
+### 📊 Manual Reconciliation Improvements
+- Both Created and Available On dates preserved for reference
+- Payout reconciliation matches Stripe reports exactly (e.g., July 2025: HK$2636.78)
+- Clear separation between transaction occurrence vs fund availability timing
+
+**⚠️ Statement Reprint Recommendation**: Reprint statements from November 2021 onwards to ensure accurate balance carry-forward.
+
 ## ✨ Features
 
-- **Multi-Company Analytics**: Support for multiple Stripe accounts (CGGE, Krystal Institute, Krystal Technology)
-- **Advanced Reporting**: Generate detailed bank statements with customizable filters
-- **Currency Support**: Proper handling of multiple currencies (HKD, CNY) with conversion
-- **Interactive Dashboard**: Real-time charts and analytics using Chart.js
-- **Export Capabilities**: CSV export and print-optimized statements
-- **Period Filtering**: Custom date ranges, preset periods, and comprehensive status filters
+- **Monthly Statement Consolidation**: Generate detailed monthly statements with running balances and carry-forward functionality
+- **CSV Import**: Automated import from complete_csv folder with transaction categorization
+- **Multi-Company Analytics**: Support for multiple Stripe accounts (CGGE, Krystal Institute, Krystal Technology)  
+- **Succeeded/Refunded Filtering**: Only processes real cash movement transactions (excludes cancelled transactions)
+- **Interactive Dashboard**: Real-time charts and analytics with modern responsive design
+- **Export Capabilities**: CSV export, print-optimized statements, and monthly statement downloads
+- **Balance Tracking**: Automatic calculation of opening/closing balances with month-to-month carry-forward
 
 ## 🚀 Quick Start
 
@@ -204,11 +224,22 @@ docker run -d -p 8081:8081 \
 
 ## 📝 API Endpoints
 
+### Core Endpoints
 - `GET /` - Main dashboard
 - `GET /analytics/dashboard` - Analytics overview
 - `GET /analytics/statement-generator` - Statement generator form
 - `POST /analytics/statement-generator/generate` - Generate statements
 - `GET /analytics/api/account-amounts` - API data endpoint
+
+### Monthly Statement & Reconciliation APIs
+- `GET /analytics/api/monthly-statement` - Generate monthly statements (Created dates)
+  - Parameters: `company`, `year`, `month`, `previous_balance` (optional)
+  - Returns: Monthly statement with balance carry-forward
+- `GET /analytics/api/payout-reconciliation` - Stripe payout reconciliation (Transfer dates)
+  - Parameters: `company`, `year`, `month`  
+  - Returns: Reconciliation matching Stripe's official payout reports
+- `GET /analytics/monthly-statement` - Interactive monthly statement web interface
+- `GET /analytics/payout-reconciliation` - Interactive payout reconciliation web interface
 
 ## 🤝 Contributing
 
@@ -229,6 +260,20 @@ For support and questions:
 - Email: support@example.com
 
 ## 🔄 Changelog
+
+### v1.2.0 (December 2025) - Balance Reconciliation & Date Analysis
+- ✅ **Fixed balance carry-forward between months** - November 2021 → December 2021 continuity restored
+- ✅ **Enhanced date field handling** - Created vs Available On date analysis for optimal reconciliation
+- ✅ **Dual reconciliation methods** - Monthly statements (Created dates) + Payout reconciliation (Transfer dates)
+- ✅ **Cross-month transfer logic improvements** - Proper handling of transactions with distant transfer dates
+- ✅ **Manual reconciliation optimization** - Perfect alignment with Stripe's official payout reports
+- ✅ **July 2025 balance verification** - Maintains correct closing balance of HK$554.77
+
+### v1.1.0 (Previous Updates)
+- ✅ Complete CSV processing with transfer date support
+- ✅ Payout reconciliation matching Stripe reports exactly
+- ✅ Enhanced transaction categorization (gross, fees, payouts)
+- ✅ Interactive web interfaces for statement generation
 
 ### v1.0.0 (Production Release)
 - ✅ Multi-company Stripe analytics

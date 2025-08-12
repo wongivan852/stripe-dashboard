@@ -45,7 +45,7 @@ def create_app():
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Payment Dashboard</title>
+            <title>Company Stripe Dashboard</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -95,7 +95,7 @@ def create_app():
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>💳 Payment Dashboard</h1>
+                    <h1>💳 Company Stripe Dashboard</h1>
                     <p>Stripe Analytics & Transaction Management</p>
                 </div>
                 
@@ -110,6 +110,12 @@ def create_app():
                         <div class="nav-icon">📄</div>
                         <div class="nav-title">Statement Generator</div>
                         <div class="nav-desc">Generate custom bank statements with company and period filters, print & save options</div>
+                    </a>
+                    
+                    <a href="/analytics/monthly-statement" class="nav-item">
+                        <div class="nav-icon">📅</div>
+                        <div class="nav-title">Monthly Statement</div>
+                        <div class="nav-desc">Generate consolidated monthly statements with running balance and carry-forward</div>
                     </a>
                     
                     <a href="/analytics/api/account-amounts" class="nav-item">
@@ -134,8 +140,9 @@ def create_app():
     try:
         from app.routes.analytics import analytics_bp
         app.register_blueprint(analytics_bp, url_prefix='/analytics')
-        # Analytics blueprint registered successfully
+        print("✅ Analytics blueprint registered successfully")
     except ImportError as e:
+        print(f"❌ Analytics blueprint import failed: {e}")
         # Analytics blueprint not found - using fallback routes
         
         # Create fallback analytics routes directly in the main app
@@ -212,7 +219,7 @@ def create_app():
                 <body>
                     <div class="container">
                         <div class="header">
-                            <h1>💳 Payment Analytics - Simple View</h1>
+                            <h1>💳 Company Stripe Dashboard - Simple View</h1>
                             <p>Real-time transaction data across all Stripe accounts</p>
                         </div>
                         
