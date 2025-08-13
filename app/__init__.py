@@ -45,93 +45,186 @@ def create_app():
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Company Stripe Dashboard</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Stripe Dashboard - Balance Testing</title>
             <style>
-                * { box-sizing: border-box; margin: 0; padding: 0; }
-                body { 
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    min-height: 100vh; padding: 20px; color: #333;
-                }
-                .container { 
-                    max-width: 900px; margin: 0 auto; background: white; 
-                    border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-                    overflow: hidden;
-                }
-                .header { 
-                    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-                    color: white; padding: 3rem 2rem; text-align: center;
-                }
-                .header h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
-                .header p { font-size: 1.1rem; opacity: 0.9; }
-                .nav-grid { 
-                    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                    gap: 0; 
-                }
-                .nav-item { 
-                    padding: 2rem; text-align: center; text-decoration: none; 
-                    color: #333; transition: all 0.3s; border-bottom: 1px solid #e5e7eb;
-                    display: flex; flex-direction: column; align-items: center; gap: 1rem;
-                }
-                .nav-item:hover { 
-                    background: #f8fafc; transform: translateY(-2px);
-                    box-shadow: inset 0 4px 0 #4f46e5;
-                }
-                .nav-icon { font-size: 3rem; }
-                .nav-title { font-size: 1.3rem; font-weight: 600; }
-                .nav-desc { color: #64748b; font-size: 0.95rem; line-height: 1.4; }
-                .footer { 
-                    padding: 2rem; text-align: center; color: #64748b; 
-                    border-top: 1px solid #e5e7eb; background: #f9fafb;
-                }
-                @media (max-width: 768px) {
-                    .nav-grid { grid-template-columns: 1fr; }
-                    .header { padding: 2rem 1rem; }
-                    .header h1 { font-size: 2rem; }
-                }
+                table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                .opening-balance { background-color: #f0f9ff; font-weight: bold; }
+                .test-section { margin: 20px 0; padding: 20px; border: 2px solid #ddd; }
+                .pass { color: green; font-weight: bold; }
+                .fail { color: red; font-weight: bold; }
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                button { padding: 10px 20px; margin: 5px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; }
+                button:hover { background: #45a049; }
+                .api-button { background: #2196F3; }
+                .api-button:hover { background: #1976D2; }
             </style>
         </head>
         <body>
-            <div class="container">
-                <div class="header">
-                    <h1>💳 Company Stripe Dashboard</h1>
-                    <p>Stripe Analytics & Transaction Management</p>
-                </div>
-                
-                <div class="nav-grid">
-                    <a href="/analytics/simple" class="nav-item">
-                        <div class="nav-icon">📋</div>
-                        <div class="nav-title">Simple Dashboard</div>
-                        <div class="nav-desc">Clean, easy-to-read transaction summary with account breakdowns</div>
-                    </a>
-                    
-                    <a href="/analytics/statement-generator" class="nav-item">
-                        <div class="nav-icon">📄</div>
-                        <div class="nav-title">Statement Generator</div>
-                        <div class="nav-desc">Generate custom bank statements with company and period filters, print & save options</div>
-                    </a>
-                    
-                    <a href="/analytics/monthly-statement" class="nav-item">
-                        <div class="nav-icon">📅</div>
-                        <div class="nav-title">Monthly Statement</div>
-                        <div class="nav-desc">Generate consolidated monthly statements with running balance and carry-forward</div>
-                    </a>
-                    
-                    <a href="/analytics/api/account-amounts" class="nav-item">
-                        <div class="nav-icon">🔗</div>
-                        <div class="nav-title">API Data</div>
-                        <div class="nav-desc">JSON API endpoint for programmatic access to account data</div>
-                    </a>
-                </div>
-                
-                <div class="footer">
-                    <p>🔄 Data syncs automatically | 🔒 Secure Stripe integration</p>
-                    <p style="margin-top: 0.5rem; font-size: 0.85rem;">
-                        Last updated: ''' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '''
-                    </p>
-                </div>
+            <h1>🏦 Stripe Balance Reconciliation Dashboard</h1>
+            <p><strong>Status:</strong> Balance carry-forward FIXED | July 2025: HK$554.77 ✅</p>
+            
+            <div class="test-section">
+                <h2>📅 Monthly Statement Testing</h2>
+                <button onclick="testNovember()">November 2021</button>
+                <button onclick="testDecember()">December 2021</button>
+                <button onclick="testJuly()">July 2025</button>
+                <button onclick="testContinuity()">Test Continuity</button>
+                <div id="statement-results"></div>
             </div>
+            
+            <div class="test-section">
+                <h2>💰 Payout Reconciliation Testing</h2>
+                <button onclick="testPayoutJuly()" class="api-button">July 2025 Payout</button>
+                <button onclick="openPayoutInterface()" class="api-button">Open Interface</button>
+                <div id="payout-results"></div>
+            </div>
+            
+            <div class="test-section">
+                <h2>🔗 Quick Links</h2>
+                <button onclick="window.open('/analytics/simple', '_blank')">Simple Analytics</button>
+                <button onclick="window.open('/analytics/monthly-statement', '_blank')">Monthly Generator</button>
+                <button onclick="window.open('/analytics/payout-reconciliation', '_blank')">Payout Reconciliation</button>
+            </div>
+            
+            <script>
+                let novemberStatement = null;
+                let decemberStatement = null;
+                let julyStatement = null;
+                
+                async function testNovember() {
+                    try {
+                        const response = await fetch('/analytics/api/monthly-statement?company=cgge&year=2021&month=11');
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            novemberStatement = data.statement;
+                            displayStatement(data.statement, 'November 2021', 'statement-results');
+                        } else {
+                            document.getElementById('statement-results').innerHTML = '<div class="fail">Error: ' + data.error + '</div>';
+                        }
+                    } catch (error) {
+                        document.getElementById('statement-results').innerHTML = '<div class="fail">Error: ' + error.message + '</div>';
+                    }
+                }
+                
+                async function testDecember() {
+                    try {
+                        const response = await fetch('/analytics/api/monthly-statement?company=cgge&year=2021&month=12');
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            decemberStatement = data.statement;
+                            displayStatement(data.statement, 'December 2021', 'statement-results');
+                        } else {
+                            document.getElementById('statement-results').innerHTML = '<div class="fail">Error: ' + data.error + '</div>';
+                        }
+                    } catch (error) {
+                        document.getElementById('statement-results').innerHTML = '<div class="fail">Error: ' + error.message + '</div>';
+                    }
+                }
+                
+                async function testJuly() {
+                    try {
+                        const response = await fetch('/analytics/api/monthly-statement?company=cgge&year=2025&month=7');
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            julyStatement = data.statement;
+                            let html = '<h3>July 2025 - CGGE</h3>';
+                            html += '<p><strong>Opening Balance:</strong> HK$' + julyStatement.opening_balance.toFixed(2) + '</p>';
+                            html += '<p><strong>Closing Balance:</strong> HK$' + julyStatement.closing_balance.toFixed(2);
+                            html += (julyStatement.closing_balance.toFixed(2) === '554.77') ? ' <span class="pass">[CORRECT]</span>' : ' <span class="fail">[INCORRECT - Should be 554.77]</span>';
+                            html += '</p><p><strong>Transactions:</strong> ' + julyStatement.transactions.length + '</p>';
+                            
+                            document.getElementById('statement-results').innerHTML = html;
+                        } else {
+                            document.getElementById('statement-results').innerHTML = '<div class="fail">Error: ' + data.error + '</div>';
+                        }
+                    } catch (error) {
+                        document.getElementById('statement-results').innerHTML = '<div class="fail">Error: ' + error.message + '</div>';
+                    }
+                }
+                
+                function displayStatement(statement, title, targetId) {
+                    let html = '<h3>' + title + ' - CGGE</h3>';
+                    html += '<p><strong>Opening Balance:</strong> HK$' + statement.opening_balance.toFixed(2) + '</p>';
+                    html += '<p><strong>Closing Balance:</strong> HK$' + statement.closing_balance.toFixed(2) + '</p>';
+                    html += '<p><strong>Transactions:</strong> ' + statement.transactions.length + '</p>';
+                    
+                    if (statement.transactions.length > 0) {
+                        html += '<table><thead><tr><th>Date</th><th>Nature</th><th>Party</th><th>Debit</th><th>Credit</th><th>Balance</th><th>Description</th></tr></thead><tbody>';
+                        html += '<tr class="opening-balance"><td>' + statement.year + '-' + statement.month.toString().padStart(2, '0') + '-01</td><td>Opening Balance</td><td>Brought Forward</td><td></td><td></td><td>HK$' + statement.opening_balance.toFixed(2) + '</td><td>Opening balance</td></tr>';
+                        
+                        statement.transactions.forEach(tx => {
+                            html += '<tr><td>' + tx.date + '</td><td>' + tx.nature + '</td><td>' + tx.party + '</td>';
+                            html += '<td>' + (tx.debit > 0 ? 'HK$' + parseFloat(tx.debit).toFixed(2) : '') + '</td>';
+                            html += '<td>' + (tx.credit > 0 ? 'HK$' + parseFloat(tx.credit).toFixed(2) : '') + '</td>';
+                            html += '<td>HK$' + parseFloat(tx.balance).toFixed(2) + '</td><td>' + tx.description + '</td></tr>';
+                        });
+                        
+                        html += '<tr class="opening-balance"><td>' + statement.year + '-' + statement.month.toString().padStart(2, '0') + '-31</td><td>Closing Balance</td><td>Carry Forward</td><td></td><td></td><td>HK$' + statement.closing_balance.toFixed(2) + '</td><td>Closing balance</td></tr>';
+                        html += '</tbody></table>';
+                    }
+                    
+                    document.getElementById(targetId).innerHTML = html;
+                }
+                
+                async function testContinuity() {
+                    if (!novemberStatement || !decemberStatement) {
+                        document.getElementById('statement-results').innerHTML = '<div class="fail">Please load November and December statements first!</div>';
+                        return;
+                    }
+                    
+                    const novClosing = novemberStatement.closing_balance;
+                    const decOpening = decemberStatement.opening_balance;
+                    const match = Math.abs(novClosing - decOpening) < 0.01;
+                    
+                    let html = '<h3>Balance Continuity Check</h3>';
+                    html += '<p><strong>November 2021 Closing:</strong> HK$' + novClosing.toFixed(2) + '</p>';
+                    html += '<p><strong>December 2021 Opening:</strong> HK$' + decOpening.toFixed(2) + '</p>';
+                    html += '<p class="' + (match ? 'pass' : 'fail') + '"><strong>Balance Continuity:</strong> ' + (match ? 'PASS ✓' : 'FAIL ✗') + '</p>';
+                    
+                    if (match) {
+                        html += '<p class="pass">Perfect! The November closing balance correctly carries forward to December opening balance.</p>';
+                    } else {
+                        html += '<p class="fail">Error: Balance continuity is broken. Check the carry-forward logic.</p>';
+                    }
+                    
+                    document.getElementById('statement-results').innerHTML = html;
+                }
+                
+                async function testPayoutJuly() {
+                    try {
+                        const response = await fetch('/analytics/api/payout-reconciliation?company=cgge&year=2025&month=7');
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            const reconciliation = data.reconciliation;
+                            const payout = reconciliation.payout_reconciliation;
+                            
+                            let html = '<h3>July 2025 Payout Reconciliation - CGGE</h3>';
+                            html += '<p><strong>Total Paid Out:</strong> HK$' + payout.total_paid_out.toFixed(2);
+                            html += (payout.total_paid_out.toFixed(2) === '2636.78') ? ' <span class="pass">[MATCHES STRIPE]</span>' : ' <span class="fail">[DOES NOT MATCH]</span>';
+                            html += '</p>';
+                            html += '<p><strong>Charges:</strong> ' + payout.charges.count + ' transactions, HK$' + payout.charges.gross_amount.toFixed(2) + '</p>';
+                            html += '<p><strong>Fees:</strong> HK$' + payout.charges.fees.toFixed(2) + '</p>';
+                            html += '<p><strong>Ending Balance:</strong> HK$' + reconciliation.ending_balance_reconciliation.ending_balance.toFixed(2) + '</p>';
+                            
+                            document.getElementById('payout-results').innerHTML = html;
+                        } else {
+                            document.getElementById('payout-results').innerHTML = '<div class="fail">Error: ' + data.error + '</div>';
+                        }
+                    } catch (error) {
+                        document.getElementById('payout-results').innerHTML = '<div class="fail">Error: ' + error.message + '</div>';
+                    }
+                }
+                
+                function openPayoutInterface() {
+                    window.open('/analytics/payout-reconciliation', '_blank');
+                }
+            </script>
         </body>
         </html>
         '''

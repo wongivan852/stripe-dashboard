@@ -136,6 +136,352 @@ def csv_export():
             'timestamp': datetime.now().isoformat()
         }), 500
 
+@analytics_bp.route('/api/export-pdf')
+def export_pdf():
+    """Export monthly statement as PDF"""
+    try:
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.units import inch
+        from app.services.complete_csv_service import CompleteCsvService
+        
+        # Get parameters
+        company = request.args.get('company')
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)
+        
+        if not all([company, year, month]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        # Generate statement data
+        service = CompleteCsvService()
+        statement = service.generate_monthly_statement(year, month, company)
+        
+        # Create PDF in memory
+        from io import BytesIO
+        buffer = BytesIO()
+        
+        # Create PDF document with landscape orientation for better table fit
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), 
+                              rightMargin=0.5*inch, leftMargin=0.5*inch,
+                              topMargin=0.5*inch, bottomMargin=0.5*inch)
+        
+        # Get styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            textColor=colors.white,
+            alignment=1,  # Center alignment
+            spaceAfter=6
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'CustomSubtitle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.white,
+            alignment=1,
+            spaceAfter=12
+        )
+        
+        # Build PDF content
+        story = []
+        
+        # Header with blue background
+        header_data = [[
+            Paragraph("📄 Monthly Statement Generator", title_style),
+        ], [
+            Paragraph("Generate consolidated monthly statements with running balance", subtitle_style)
+        ]]
+        
+        header_table = Table(header_data, colWidths=[8*inch])
+        header_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.Color(91/255, 130/255, 243/255)),  # Blue background
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 20),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 20),
+            ('TOPPADDING', (0, 0), (-1, -1), 15),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+        ]))
+        
+        story.append(header_table)
+        story.append(Spacer(1, 20))
+        
+        # Summary information
+        month_names = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December']
+        
+        company_name = company.upper() if company == 'cgge' else company.title()
+        
+        summary_data = [
+            ['Company:', company_name],
+            ['Period:', f"{month_names[month]} {year}"],
+            ['Opening Balance:', f"HK${statement['opening_balance']:.2f}"],
+            ['Closing Balance:', f"HK${statement['closing_balance']:.2f}"],
+            ['Total Transactions:', str(len(statement['transactions']))]
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[2*inch, 2*inch])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.Color(227/255, 242/255, 253/255)),  # Light blue
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.Color(13/255, 71/255, 161/255)),     # Dark blue
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 2, colors.Color(25/255, 118/255, 210/255)),      # Blue border
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        
+        story.append(summary_table)
+        story.append(Spacer(1, 20))
+        
+        # Transaction table
+        table_data = [['Date', 'Nature', 'Party', 'Debit', 'Credit', 'Balance', 'Ack', 'Description']]
+        
+        # Opening balance row
+        table_data.append([
+            f"{year}-{month:02d}-01",
+            "Opening Balance", 
+            "Brought Forward",
+            "",
+            "",
+            f"HK${statement['opening_balance']:.2f}",
+            "Yes",
+            f"Opening balance for {month_names[month]} {year}"
+        ])
+        
+        # Transaction rows
+        for tx in statement['transactions']:
+            date_str = tx['date'][:10] if isinstance(tx['date'], str) else str(tx['date'])[:10]
+            debit = f"HK${float(tx['debit']):.2f}" if tx['debit'] > 0 else ""
+            credit = f"HK${float(tx['credit']):.2f}" if tx['credit'] > 0 else ""
+            balance = f"HK${float(tx['balance']):.2f}"
+            
+            table_data.append([
+                date_str,
+                tx['nature'],
+                tx['party'],
+                debit,
+                credit,
+                balance,
+                "No",
+                tx['description']
+            ])
+        
+        # Subtotal row
+        table_data.append([
+            "SUBTOTAL",
+            "",
+            "",
+            f"HK${statement['total_debit']}",
+            f"HK${statement['total_credit']}",
+            "",
+            "",
+            ""
+        ])
+        
+        # Closing balance row
+        table_data.append([
+            f"{year}-{month:02d}-31",
+            "Closing Balance",
+            "Carry Forward",
+            "",
+            "",
+            f"HK${statement['closing_balance']:.2f}",
+            "Yes",
+            f"Closing balance for {month_names[month]} {year}"
+        ])
+        
+        # Create table with appropriate column widths for landscape
+        col_widths = [0.8*inch, 1*inch, 1.2*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.5*inch, 1.5*inch]
+        table = Table(table_data, colWidths=col_widths)
+        
+        # Style the table to match PDF sample
+        table.setStyle(TableStyle([
+            # Header row
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(245/255, 245/255, 245/255)),  # Light grey
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.Color(51/255, 51/255, 51/255)),       # Dark grey
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            
+            # Opening balance row
+            ('BACKGROUND', (0, 1), (-1, 1), colors.Color(240/255, 249/255, 255/255)),   # Light blue
+            ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+            
+            # Data rows - white background
+            ('BACKGROUND', (0, 2), (-1, -3), colors.white),
+            ('GRID', (0, 0), (-1, -1), 1, colors.Color(153/255, 153/255, 153/255)),     # Grey borders
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            
+            # Subtotal row with orange background
+            ('BACKGROUND', (0, -2), (-1, -2), colors.Color(255/255, 243/255, 205/255)), # Light orange
+            ('FONTNAME', (0, -2), (-1, -2), 'Helvetica-Bold'),
+            ('TEXTCOLOR', (0, -2), (-1, -2), colors.Color(180/255, 83/255, 9/255)),     # Dark orange
+            
+            # Closing balance row
+            ('BACKGROUND', (0, -1), (-1, -1), colors.Color(240/255, 249/255, 255/255)), # Light blue
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            
+            # Align amounts to right
+            ('ALIGN', (3, 1), (5, -1), 'RIGHT'),
+            ('ALIGN', (6, 0), (6, -1), 'CENTER'),  # Acknowledged column center
+            ('ALIGN', (0, 0), (2, -1), 'LEFT'),    # Date, Nature, Party left aligned
+        ]))
+        
+        story.append(table)
+        
+        # Build PDF
+        doc.build(story)
+        
+        # Get PDF data
+        pdf_data = buffer.getvalue()
+        buffer.close()
+        
+        # Return as download
+        filename = f"MonthlyStatement_{company}_{year}_{month:02d}.pdf"
+        
+        response = Response(
+            pdf_data,
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Length': str(len(pdf_data))
+            }
+        )
+        
+        return response
+        
+    except ImportError:
+        return jsonify({
+            'error': 'PDF export requires reportlab library. Install with: pip install reportlab'
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'error': 'PDF export failed',
+            'details': str(e)
+        }), 500
+
+@analytics_bp.route('/api/export-csv-statement')
+def export_csv_statement():
+    """Export monthly statement as CSV"""
+    try:
+        from app.services.complete_csv_service import CompleteCsvService
+        
+        # Get parameters
+        company = request.args.get('company')
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)
+        
+        if not all([company, year, month]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        # Generate statement data
+        service = CompleteCsvService()
+        statement = service.generate_monthly_statement(year, month, company)
+        
+        # Create CSV content
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow(['Date', 'Nature', 'Party', 'Debit', 'Credit', 'Balance', 'Acknowledged', 'Description'])
+        
+        # Month names for description
+        month_names = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December']
+        
+        # Opening balance row
+        writer.writerow([
+            f"{year}-{month:02d}-01",
+            "Opening Balance",
+            "Brought Forward",
+            "",
+            "",
+            f"{statement['opening_balance']:.2f}",
+            "Yes",
+            f"Opening balance for {month_names[month]} {year}"
+        ])
+        
+        # Transaction rows
+        for tx in statement['transactions']:
+            date_str = tx['date'][:10] if isinstance(tx['date'], str) else str(tx['date'])[:10]
+            debit = f"{float(tx['debit']):.2f}" if tx['debit'] > 0 else ""
+            credit = f"{float(tx['credit']):.2f}" if tx['credit'] > 0 else ""
+            balance = f"{float(tx['balance']):.2f}"
+            
+            writer.writerow([
+                date_str,
+                tx['nature'],
+                tx['party'],
+                debit,
+                credit,
+                balance,
+                "No",
+                tx['description']
+            ])
+        
+        # Subtotal row
+        writer.writerow([
+            "SUBTOTAL",
+            "",
+            "",
+            statement['total_debit'],
+            statement['total_credit'],
+            "",
+            "",
+            ""
+        ])
+        
+        # Closing balance row
+        writer.writerow([
+            f"{year}-{month:02d}-31",
+            "Closing Balance",
+            "Carry Forward",
+            "",
+            "",
+            f"{statement['closing_balance']:.2f}",
+            "Yes",
+            f"Closing balance for {month_names[month]} {year}"
+        ])
+        
+        csv_content = output.getvalue()
+        output.close()
+        
+        # Return as download
+        filename = f"MonthlyStatement_{company}_{year}_{month:02d}.csv"
+        
+        response = Response(
+            csv_content,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'CSV export failed',
+            'details': str(e)
+        }), 500
+
 @analytics_bp.route('/api/verify-transactions')
 def verify_transactions():
     """Simple endpoint to verify total transaction counts"""
@@ -3622,16 +3968,659 @@ def payout_reconciliation_api():
                 'error': 'Missing required parameters: company, year, month'
             }), 400
         
+        logger.info(f"Generating payout reconciliation for {company} {year}-{month:02d}")
+        
         service = CompleteCsvService()
         reconciliation = service.generate_payout_reconciliation(year, month, company)
         
+        logger.info(f"Payout reconciliation completed successfully")
+        
         return jsonify({
             'success': True,
-            'reconciliation': reconciliation
+            'reconciliation': reconciliation,
+            'timestamp': datetime.now().isoformat(),
+            'debug_info': {
+                'total_transactions_processed': len(reconciliation.get('payout_reconciliation', {}).get('transactions', [])),
+                'calculation_method': 'transfer_date_based'
+            }
         })
         
     except Exception as e:
+        logger.error(f"Payout reconciliation failed: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
         }), 500
+# Web Interface Routes for Monthly Statement and Payout Reconciliation
+
+@analytics_bp.route('/monthly-statement')
+def monthly_statement_interface():
+    """Interactive monthly statement interface with PDF-style formatting"""
+    from app.services.complete_csv_service import CompleteCsvService
+    
+    service = CompleteCsvService()
+    companies = service.get_available_companies()
+    
+    html = '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>📄 Monthly Statement Generator</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                background: #f8fafc; line-height: 1.4; color: #334155; padding: 20px;
+            }
+            .container { max-width: 1400px; margin: 0 auto; }
+            .header { 
+                background: linear-gradient(135deg, #5B82F3 0%, #7C3AED 100%); 
+                color: white; padding: 2rem; text-align: center; border-radius: 12px; 
+                margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            }
+            .controls {
+                background: white; padding: 2rem; border-radius: 12px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 2rem;
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem; align-items: end;
+            }
+            .form-group { display: flex; flex-direction: column; }
+            .form-group label { font-weight: 600; margin-bottom: 0.5rem; color: #374151; }
+            .form-group select, .form-group input, .form-group button {
+                padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;
+                font-size: 1rem;
+            }
+            .form-group button {
+                background: #4f46e5; color: white; border: none; cursor: pointer;
+                font-weight: 600; transition: background 0.2s;
+            }
+            .form-group button:hover { background: #4338ca; }
+            
+            /* Action buttons */
+            .action-buttons {
+                background: white; padding: 1rem 2rem; border-radius: 12px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 2rem;
+                display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;
+            }
+            .action-btn {
+                padding: 0.75rem 1.5rem; border: none; border-radius: 8px;
+                font-weight: 600; cursor: pointer; transition: all 0.2s;
+                font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem;
+            }
+            .print-btn { background: #059669; color: white; }
+            .print-btn:hover { background: #047857; }
+            .export-pdf-btn { background: #dc2626; color: white; }
+            .export-pdf-btn:hover { background: #b91c1c; }
+            .export-csv-btn { background: #2563eb; color: white; }
+            .export-csv-btn:hover { background: #1d4ed8; }
+            .save-btn { background: #7c3aed; color: white; }
+            .save-btn:hover { background: #6d28d9; }
+            
+            /* Statement styling to match PDF */
+            .statement-container {
+                background: white; border-radius: 12px; padding: 0;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.08); min-height: 200px;
+                overflow: hidden;
+            }
+            .statement-header {
+                background: linear-gradient(135deg, #5B82F3 0%, #7C3AED 100%);
+                color: white; padding: 2rem; text-align: center;
+            }
+            .statement-header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+            .statement-header p { font-size: 1.1rem; opacity: 0.9; }
+            
+            .statement-summary {
+                background: #E3F2FD; border: 2px solid #1976D2; 
+                margin: 2rem; padding: 1.5rem; border-radius: 8px;
+            }
+            .statement-summary h3 { color: #0D47A1; margin-bottom: 1rem; font-size: 1.3rem; font-weight: 600; }
+            .summary-grid {
+                display: grid; grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
+            .summary-item { display: flex; justify-content: space-between; }
+            .summary-item strong { color: #0D47A1; font-weight: 600; }
+            
+            .statement-content { padding: 0 2rem 2rem 2rem; }
+            
+            /* Table styling to match PDF exactly */
+            .statement-table { 
+                width: 100%; border-collapse: collapse; margin: 1rem 0; 
+                font-size: 0.85rem; border: 1px solid #999;
+            }
+            .statement-table th { 
+                background: #f5f5f5; padding: 10px 6px; text-align: center;
+                border: 1px solid #999; font-weight: 600; color: #333;
+                font-size: 0.8rem;
+            }
+            .statement-table td { 
+                padding: 6px 4px; text-align: left; border: 1px solid #999;
+                vertical-align: middle; font-size: 0.8rem;
+            }
+            .statement-table td:nth-child(4), 
+            .statement-table td:nth-child(5), 
+            .statement-table td:nth-child(6) { 
+                text-align: right; 
+            }
+            .statement-table th:nth-child(4), 
+            .statement-table th:nth-child(5), 
+            .statement-table th:nth-child(6) { 
+                text-align: center; 
+            }
+            .statement-table th:nth-child(7) { 
+                text-align: center; 
+            }
+            .opening-balance, .closing-balance { 
+                background: #f0f9ff; font-weight: 600; 
+            }
+            .opening-balance td, .closing-balance td { font-weight: 600; }
+            .debit-amount { color: #DC2626; font-weight: 500; }
+            .credit-amount { color: #059669; font-weight: 500; }
+            
+            /* Subtotal row */
+            .subtotal-row { 
+                background: #FFF3CD; border: 2px solid #FF8F00 !important; 
+                font-weight: bold; 
+            }
+            .subtotal-row td { 
+                border: 2px solid #FF8F00 !important; 
+                font-weight: bold; 
+                color: #B45309;
+            }
+            
+            .loading { text-align: center; color: #6b7280; padding: 2rem; }
+            
+            /* Date formatting */
+            .date-col { width: 80px; font-size: 0.85rem; }
+            .nature-col { width: 100px; }
+            .party-col { width: 120px; font-size: 0.85rem; }
+            .amount-col { width: 100px; }
+            .balance-col { width: 100px; }
+            .desc-col { width: 150px; font-size: 0.85rem; }
+            .ack-col { width: 80px; text-align: center; }
+            
+            /* Print styles */
+            @media print {
+                body { background: white; padding: 0; }
+                .container { max-width: none; margin: 0; }
+                .header, .controls, .action-buttons { display: none; }
+                .statement-container { box-shadow: none; border-radius: 0; }
+                .statement-table { font-size: 0.8rem; }
+                .statement-table th, .statement-table td { padding: 6px 4px; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>📄 Monthly Statement Generator</h1>
+                <p>Generate consolidated monthly statements with running balance</p>
+            </div>
+            
+            <div class="controls">
+                <div class="form-group">
+                    <label for="company">Company</label>
+                    <select id="company">''' + ''.join([f'<option value="{c["code"]}">{c["name"]}</option>' for c in companies]) + '''</select>
+                </div>
+                <div class="form-group">
+                    <label for="year">Year</label>
+                    <input type="number" id="year" value="2025" min="2020" max="2030">
+                </div>
+                <div class="form-group">
+                    <label for="month">Month</label>
+                    <select id="month">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7" selected>July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button onclick="generateStatement()">Generate Statement</button>
+                </div>
+            </div>
+            
+            <div class="action-buttons" id="actionButtons" style="display: none;">
+                <button class="action-btn print-btn" onclick="printStatement()">🖨️ Print</button>
+                <button class="action-btn export-pdf-btn" onclick="exportPDF()">📄 Export PDF</button>
+                <button class="action-btn export-csv-btn" onclick="exportCSV()">📊 Export CSV</button>
+                <button class="action-btn save-btn" onclick="saveStatement()">💾 Save</button>
+            </div>
+            
+            <div class="statement-container" id="results">
+                <div class="loading">Select parameters and click "Generate Statement" to begin</div>
+            </div>
+        </div>
+        
+        <script>
+            let currentStatement = null;
+            
+            async function generateStatement() {
+                const company = document.getElementById('company').value;
+                const year = document.getElementById('year').value;
+                const month = document.getElementById('month').value;
+                
+                document.getElementById('results').innerHTML = '<div class="loading">Generating statement...</div>';
+                document.getElementById('actionButtons').style.display = 'none';
+                
+                try {
+                    const response = await fetch(`/analytics/api/monthly-statement?company=${company}&year=${year}&month=${month}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        currentStatement = data.statement;
+                        displayStatement(data.statement);
+                        document.getElementById('actionButtons').style.display = 'flex';
+                    } else {
+                        document.getElementById('results').innerHTML = `<div class="loading" style="color: #ef4444;">Error: ${data.error}</div>`;
+                    }
+                } catch (error) {
+                    document.getElementById('results').innerHTML = `<div class="loading" style="color: #ef4444;">Error: ${error.message}</div>`;
+                }
+            }
+            
+            function displayStatement(statement) {
+                const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+                                 'July', 'August', 'September', 'October', 'November', 'December'];
+                
+                const companyName = statement.company_filter === 'cgge' ? 'cgge' : 
+                                  statement.company_filter === 'ki' ? 'Krystal Institute' :
+                                  statement.company_filter === 'kt' ? 'Krystal Technology' :
+                                  statement.company_filter || 'All Companies';
+                
+                let html = `
+                    <div class="statement-header">
+                        <h1>📄 Monthly Statement Generator</h1>
+                        <p>Generate consolidated monthly statements with running balance</p>
+                    </div>
+                    
+                    <div class="statement-summary">
+                        <h3>Statement Summary for ${monthNames[statement.month]} ${statement.year}</h3>
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <span><strong>Company:</strong></span>
+                                <span>${companyName}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span><strong>Opening Balance:</strong></span>
+                                <span>HK$${statement.opening_balance.toFixed(2)}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span><strong>Closing Balance:</strong></span>
+                                <span>HK$${statement.closing_balance.toFixed(2)}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span><strong>Total Transactions:</strong></span>
+                                <span>${statement.transactions.length}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="statement-content">
+                        <table class="statement-table">
+                            <thead>
+                                <tr>
+                                    <th class="date-col">Date</th>
+                                    <th class="nature-col">Nature</th>
+                                    <th class="party-col">Party</th>
+                                    <th class="amount-col">Debit</th>
+                                    <th class="amount-col">Credit</th>
+                                    <th class="balance-col">Balance</th>
+                                    <th class="ack-col">Acknowledged</th>
+                                    <th class="desc-col">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="opening-balance">
+                                    <td>${statement.year}-${statement.month.toString().padStart(2, '0')}-01</td>
+                                    <td>Opening Balance</td>
+                                    <td>Brought Forward</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td>HK$${statement.opening_balance.toFixed(2)}</td>
+                                    <td>Yes</td>
+                                    <td>Opening balance for ${monthNames[statement.month]} ${statement.year}</td>
+                                </tr>
+                `;
+                
+                statement.transactions.forEach(tx => {
+                    const dateFormatted = new Date(tx.date).toISOString().split('T')[0];
+                    const debitDisplay = tx.debit > 0 ? `<span class="debit-amount">HK$${parseFloat(tx.debit).toFixed(2)}</span>` : '';
+                    const creditDisplay = tx.credit > 0 ? `<span class="credit-amount">HK$${parseFloat(tx.credit).toFixed(2)}</span>` : '';
+                    html += `
+                        <tr>
+                            <td class="date-col">${dateFormatted}</td>
+                            <td class="nature-col">${tx.nature}</td>
+                            <td class="party-col">${tx.party}</td>
+                            <td class="amount-col">${debitDisplay}</td>
+                            <td class="amount-col">${creditDisplay}</td>
+                            <td class="balance-col">HK$${parseFloat(tx.balance).toFixed(2)}</td>
+                            <td class="ack-col">No</td>
+                            <td class="desc-col">${tx.description}</td>
+                        </tr>
+                    `;
+                });
+                
+                // Add subtotal row
+                html += `
+                    <tr class="subtotal-row">
+                        <td colspan="3"><strong>SUBTOTAL</strong></td>
+                        <td><strong><span class="debit-amount">HK$${statement.total_debit}</span></strong></td>
+                        <td><strong><span class="credit-amount">HK$${statement.total_credit}</span></strong></td>
+                        <td colspan="3"></td>
+                    </tr>
+                `;
+                
+                html += `
+                                <tr class="closing-balance">
+                                    <td>${statement.year}-${statement.month.toString().padStart(2, '0')}-31</td>
+                                    <td>Closing Balance</td>
+                                    <td>Carry Forward</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td>HK$${statement.closing_balance.toFixed(2)}</td>
+                                    <td>Yes</td>
+                                    <td>Closing balance for ${monthNames[statement.month]} ${statement.year}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                document.getElementById('results').innerHTML = html;
+            }
+            
+            function printStatement() {
+                window.print();
+            }
+            
+            async function exportPDF() {
+                if (!currentStatement) return;
+                
+                try {
+                    const company = document.getElementById('company').value;
+                    const year = document.getElementById('year').value;
+                    const month = document.getElementById('month').value;
+                    
+                    const response = await fetch(`/analytics/api/export-pdf?company=${company}&year=${year}&month=${month}`);
+                    
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = `monthly-statement-${company}-${year}-${month.toString().padStart(2, '0')}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                    } else {
+                        alert('Export failed. Please try again.');
+                    }
+                } catch (error) {
+                    alert('Export failed: ' + error.message);
+                }
+            }
+            
+            async function exportCSV() {
+                if (!currentStatement) return;
+                
+                try {
+                    const company = document.getElementById('company').value;
+                    const year = document.getElementById('year').value;
+                    const month = document.getElementById('month').value;
+                    
+                    const response = await fetch(`/analytics/api/export-csv-statement?company=${company}&year=${year}&month=${month}`);
+                    
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = `monthly-statement-${company}-${year}-${month.toString().padStart(2, '0')}.csv`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                    } else {
+                        alert('Export failed. Please try again.');
+                    }
+                } catch (error) {
+                    alert('Export failed: ' + error.message);
+                }
+            }
+            
+            function saveStatement() {
+                if (!currentStatement) return;
+                
+                const company = document.getElementById('company').value;
+                const year = document.getElementById('year').value;
+                const month = document.getElementById('month').value;
+                const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+                                 'July', 'August', 'September', 'October', 'November', 'December'];
+                
+                const filename = `${company}-MonthlyStatement_${year}_${month.toString().padStart(2, '0')}.html`;
+                const content = document.documentElement.outerHTML;
+                
+                const blob = new Blob([content], { type: 'text/html' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
+        </script>
+    </body>
+    </html>
+    '''
+    
+    return html
+
+@analytics_bp.route('/payout-reconciliation')
+def payout_reconciliation_interface():
+    """Interactive payout reconciliation interface"""
+    from app.services.complete_csv_service import CompleteCsvService
+    
+    service = CompleteCsvService()
+    companies = service.get_available_companies()
+    
+    html = '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Payout Reconciliation</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                background: #f8fafc; line-height: 1.6; color: #334155; padding: 20px;
+            }
+            .container { max-width: 1200px; margin: 0 auto; }
+            .header { 
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                color: white; padding: 2rem; text-align: center; border-radius: 12px; 
+                margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            }
+            .controls {
+                background: white; padding: 2rem; border-radius: 12px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 2rem;
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem; align-items: end;
+            }
+            .form-group { display: flex; flex-direction: column; }
+            .form-group label { font-weight: 600; margin-bottom: 0.5rem; color: #374151; }
+            .form-group select, .form-group input, .form-group button {
+                padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;
+                font-size: 1rem;
+            }
+            .form-group button {
+                background: #10b981; color: white; border: none; cursor: pointer;
+                font-weight: 600; transition: background 0.2s;
+            }
+            .form-group button:hover { background: #059669; }
+            .results {
+                background: white; border-radius: 12px; padding: 2rem;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.08); min-height: 200px;
+            }
+            .summary-grid {
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 1rem; margin: 2rem 0;
+            }
+            .summary-card {
+                background: #f8fafc; padding: 1.5rem; border-radius: 8px;
+                border-left: 4px solid #10b981;
+            }
+            .summary-card h3 { font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem; }
+            .summary-card .value { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
+            .loading { text-align: center; color: #6b7280; padding: 2rem; }
+            .highlight { background: #f0fdf4; padding: 1rem; border-radius: 8px; border-left: 4px solid #10b981; margin: 1rem 0; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>💰 Payout Reconciliation</h1>
+                <p>Reconciliation matching Stripe's official payout reports using Transfer dates</p>
+            </div>
+            
+            <div class="controls">
+                <div class="form-group">
+                    <label for="company">Company</label>
+                    <select id="company">''' + ''.join([f'<option value="{c["code"]}">{c["name"]}</option>' for c in companies]) + '''</select>
+                </div>
+                <div class="form-group">
+                    <label for="year">Year</label>
+                    <input type="number" id="year" value="2025" min="2020" max="2030">
+                </div>
+                <div class="form-group">
+                    <label for="month">Month</label>
+                    <select id="month">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7" selected>July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button onclick="generateReconciliation()">Generate Reconciliation</button>
+                </div>
+            </div>
+            
+            <div class="results" id="results">
+                <div class="loading">Select parameters and click "Generate Reconciliation" to begin</div>
+            </div>
+        </div>
+        
+        <script>
+            async function generateReconciliation() {
+                const company = document.getElementById('company').value;
+                const year = document.getElementById('year').value;
+                const month = document.getElementById('month').value;
+                
+                document.getElementById('results').innerHTML = '<div class="loading">Generating reconciliation...</div>';
+                
+                try {
+                    const response = await fetch(`/analytics/api/payout-reconciliation?company=${company}&year=${year}&month=${month}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        displayReconciliation(data.reconciliation);
+                    } else {
+                        document.getElementById('results').innerHTML = `<div class="loading" style="color: #ef4444;">Error: ${data.error}</div>`;
+                    }
+                } catch (error) {
+                    document.getElementById('results').innerHTML = `<div class="loading" style="color: #ef4444;">Error: ${error.message}</div>`;
+                }
+            }
+            
+            function displayReconciliation(reconciliation) {
+                const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+                                 'July', 'August', 'September', 'October', 'November', 'December'];
+                
+                const payout = reconciliation.payout_reconciliation;
+                const ending = reconciliation.ending_balance_reconciliation;
+                
+                let html = `
+                    <h2>Payout Reconciliation - ${monthNames[reconciliation.month]} ${reconciliation.year}</h2>
+                    
+                    <div class="highlight">
+                        <strong>This report matches Stripe's official payout reconciliation by using Transfer dates instead of Created dates.</strong>
+                    </div>
+                    
+                    <h3>Transactions Paid Out This Month</h3>
+                    <div class="summary-grid">
+                        <div class="summary-card">
+                            <h3>Charges</h3>
+                            <div class="value">${payout.charges.count} transactions</div>
+                            <div>Gross: HK$${payout.charges.gross_amount.toFixed(2)}</div>
+                            <div>Fees: HK$${payout.charges.fees.toFixed(2)}</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Refunds</h3>
+                            <div class="value">${payout.refunds.count} transactions</div>
+                            <div>Amount: HK$${payout.refunds.gross_amount.toFixed(2)}</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Payout Reversals</h3>
+                            <div class="value">${payout.payout_reversals.count} transactions</div>
+                            <div>Amount: HK$${payout.payout_reversals.gross_amount.toFixed(2)}</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Total Paid Out</h3>
+                            <div class="value">HK$${payout.total_paid_out.toFixed(2)}</div>
+                        </div>
+                    </div>
+                    
+                    <h3>Ending Balance (Future Transfers)</h3>
+                    <div class="summary-grid">
+                        <div class="summary-card">
+                            <h3>Pending Charges</h3>
+                            <div class="value">${ending.charges.count} transactions</div>
+                            <div>Gross: HK$${ending.charges.gross_amount.toFixed(2)}</div>
+                            <div>Fees: HK$${ending.charges.fees.toFixed(2)}</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Pending Reversals</h3>
+                            <div class="value">${ending.payout_reversals.count} transactions</div>
+                            <div>Amount: HK$${ending.payout_reversals.gross_amount.toFixed(2)}</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Ending Balance</h3>
+                            <div class="value">HK$${ending.ending_balance.toFixed(2)}</div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('results').innerHTML = html;
+            }
+        </script>
+    </body>
+    </html>
+    '''
+    
+    return html
