@@ -3,15 +3,33 @@
 flask.log
 app.log
 *.tmp
+logs/
 
-# Environment files
+# Environment files (keep .env.production as template)
 .env
 .env.local
-.env.production
 
 # Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # System files
 .DS_Store
@@ -28,16 +46,20 @@ Thumbs.db
 *.swp
 *.swo
 *~
+.spyderproject
+.spyproject
 
 # Database files (development)
 instance/
 *.db
+*.sqlite3
 
 # Temporary import scripts
 import_*.py
 
-# PDF reports and temporary files
-*.pdf
+# PDF reports and temporary files (keep test exports)
+CGGE-MonthlyStatement_*.pdf
+test_export_*.pdf
 stripe_report_*.txt
 
 # Validation and temporary scripts
@@ -45,3 +67,61 @@ validate_*.py
 
 # Claude AI workspace
 .claude/
+
+# Production deployment files (keep for deployment)
+# These should be in the repository
+# wsgi.py - keep
+# gunicorn.conf.py - keep
+# systemd/ - keep
+# scripts/ - keep
+# config/ - keep
+
+# Runtime files
+*.pid
+*.sock
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Security sensitive files
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# Local development overrides
+docker-compose.override.yml
+.env.development
+
+# OS generated files
+*.swp
+*.lock
+*.DS_Store
+Thumbs.db
