@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📄 Monthly Statement Generator - Style Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #f8fafc; line-height: 1.4; color: #334155; padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { 
+            background: linear-gradient(135deg, #5B82F3 0%, #7C3AED 100%); 
+            color: white; padding: 2rem; text-align: center; border-radius: 12px; 
+            margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        /* Statement styling to match PDF */
+        .statement-container {
+            background: white; border-radius: 12px; padding: 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08); min-height: 200px;
+            overflow: hidden;
+        }
+        .statement-header {
+            background: linear-gradient(135deg, #5B82F3 0%, #7C3AED 100%);
+            color: white; padding: 2rem; text-align: center;
+        }
+        .statement-header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        .statement-header p { font-size: 1.1rem; opacity: 0.9; }
+        
+        .statement-summary {
+            background: #E3F2FD; border: 2px solid #1976D2; 
+            margin: 2rem; padding: 1.5rem; border-radius: 8px;
+        }
+        .statement-summary h3 { color: #0D47A1; margin-bottom: 1rem; font-size: 1.3rem; font-weight: 600; }
+        .summary-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+        .summary-item { display: flex; justify-content: space-between; }
+        .summary-item strong { color: #0D47A1; font-weight: 600; }
+        
+        .statement-content { padding: 0 2rem 2rem 2rem; }
+        
+        /* Table styling to match PDF exactly */
+        .statement-table { 
+            width: 100%; border-collapse: collapse; margin: 1rem 0; 
+            font-size: 0.85rem; border: 1px solid #999;
+        }
+        .statement-table th { 
+            background: #f5f5f5; padding: 10px 6px; text-align: center;
+            border: 1px solid #999; font-weight: 600; color: #333;
+            font-size: 0.8rem;
+        }
+        .statement-table td { 
+            padding: 6px 4px; text-align: left; border: 1px solid #999;
+            vertical-align: middle; font-size: 0.8rem;
+        }
+        .statement-table td:nth-child(4), 
+        .statement-table td:nth-child(5), 
+        .statement-table td:nth-child(6) { 
+            text-align: right; 
+        }
+        .statement-table th:nth-child(4), 
+        .statement-table th:nth-child(5), 
+        .statement-table th:nth-child(6) { 
+            text-align: center; 
+        }
+        .statement-table th:nth-child(7) { 
+            text-align: center; 
+        }
+        .opening-balance, .closing-balance { 
+            background: #f0f9ff; font-weight: 600; 
+        }
+        .opening-balance td, .closing-balance td { font-weight: 600; }
+        .debit-amount { color: #DC2626; font-weight: 500; }
+        .credit-amount { color: #059669; font-weight: 500; }
+        
+        /* Subtotal row */
+        .subtotal-row { 
+            background: #FFF3CD; border: 2px solid #FF8F00 !important; 
+            font-weight: bold; 
+        }
+        .subtotal-row td { 
+            border: 2px solid #FF8F00 !important; 
+            font-weight: bold; 
+            color: #B45309;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 Monthly Statement Generator</h1>
+            <p>Style Test - Matches PDF Sample</p>
+        </div>
+        
+        <div class="statement-container">
+            <div class="statement-header">
+                <h1>📄 Monthly Statement Generator</h1>
+                <p>Generate consolidated monthly statements with running balance</p>
+            </div>
+            
+            <div class="statement-summary">
+                <h3>Statement Summary for July 2025</h3>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <span><strong>Company:</strong></span>
+                        <span>cgge</span>
+                    </div>
+                    <div class="summary-item">
+                        <span><strong>Opening Balance:</strong></span>
+                        <span>HK$831.42</span>
+                    </div>
+                    <div class="summary-item">
+                        <span><strong>Closing Balance:</strong></span>
+                        <span>HK$554.77</span>
+                    </div>
+                    <div class="summary-item">
+                        <span><strong>Total Transactions:</strong></span>
+                        <span>50</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="statement-content">
+                <table class="statement-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Nature</th>
+                            <th>Party</th>
+                            <th>Debit</th>
+                            <th>Credit</th>
+                            <th>Balance</th>
+                            <th>Acknowledged</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="opening-balance">
+                            <td>2025-07-01</td>
+                            <td>Opening Balance</td>
+                            <td>Brought Forward</td>
+                            <td></td>
+                            <td></td>
+                            <td>HK$831.42</td>
+                            <td>Yes</td>
+                            <td>Opening balance for July 2025</td>
+                        </tr>
+                        <tr>
+                            <td>2025-07-02</td>
+                            <td>Gross Charge</td>
+                            <td>User 924</td>
+                            <td><span class="debit-amount">HK$96.61</span></td>
+                            <td></td>
+                            <td>HK$928.03</td>
+                            <td>No</td>
+                            <td>Gross</td>
+                        </tr>
+                        <tr>
+                            <td>2025-07-02</td>
+                            <td>Processing Fee</td>
+                            <td>Stripe</td>
+                            <td><span class="debit-amount">HK$6.12</span></td>
+                            <td></td>
+                            <td>HK$921.91</td>
+                            <td>No</td>
+                            <td>Processing fee for</td>
+                        </tr>
+                        <tr>
+                            <td>2025-07-03</td>
+                            <td>Payout</td>
+                            <td>STRIPE PAYOUT</td>
+                            <td></td>
+                            <td><span class="credit-amount">HK$831.42</span></td>
+                            <td>HK$90.49</td>
+                            <td>No</td>
+                            <td>STRIPE PAYOUT</td>
+                        </tr>
+                        <tr class="subtotal-row">
+                            <td colspan="3"><strong>SUBTOTAL</strong></td>
+                            <td><strong><span class="debit-amount">HK$2360.13</span></strong></td>
+                            <td><strong><span class="credit-amount">HK$2729.30</span></strong></td>
+                            <td colspan="3"></td>
+                        </tr>
+                        <tr class="closing-balance">
+                            <td>2025-07-31</td>
+                            <td>Closing Balance</td>
+                            <td>Carry Forward</td>
+                            <td></td>
+                            <td></td>
+                            <td>HK$554.77</td>
+                            <td>Yes</td>
+                            <td>Closing balance for July 2025</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

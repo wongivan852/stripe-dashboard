@@ -62,7 +62,11 @@ class CompleteCsvService:
             files = glob.glob(pattern)
             
             for file_path in files:
-                company_code = self._extract_company_from_filename(os.path.basename(file_path))
+                filename = os.path.basename(file_path)
+                # Skip backup files
+                if '_backup.csv' in filename.lower():
+                    continue
+                company_code = self._extract_company_from_filename(filename)
                 csv_files.append((file_path, company_code))
             
             self.logger.info(f"Found {len(csv_files)} CSV files in {self.csv_directory}")
@@ -176,6 +180,9 @@ class CompleteCsvService:
                     except ValueError:
                         pass
             
+            # Determine transaction type first
+            transaction_type = row.get('Type', '').lower()
+            
             # Parse amounts with enhanced fee handling
             amount = self._parse_decimal(row.get('Amount', '0'))
             fee = self._parse_decimal(row.get('Fee', '0'))
@@ -188,8 +195,7 @@ class CompleteCsvService:
                 self.logger.debug(f"Estimating fee for transaction {row.get('id', '')}: {estimated_fee}")
                 fee = estimated_fee.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
-            # Determine transaction type and nature
-            transaction_type = row.get('Type', '').lower()
+            # Get description
             description = row.get('Description', '').strip()
             
             # Map status based on transaction type
@@ -232,15 +238,15 @@ class CompleteCsvService:
                     'raw_row': row
                 }
                 
-                # Create fee entry (debit - but negative impact)
+                # Create fee entry (credit - reduces balance)
                 fee_tx = {
                     'id': row.get('id', '') + '_fee',
                     'stripe_id': row.get('id', ''),
                     'date': created.date() if created else (available_on if available_on else None),
                     'nature': 'Processing Fee',
                     'party': 'Stripe',
-                    'debit': abs(fee),
-                    'credit': 0,
+                    'debit': 0,
+                    'credit': abs(fee),
                     'balance': 0,
                     'acknowledged': False,
                     'description': f"Processing fee for {description}",
@@ -256,10 +262,39 @@ class CompleteCsvService:
                     'account_name': self.company_names.get(company_code, 'Unknown Company'),
                     'company_code': company_code,
                     'raw_row': row,
-                    'is_fee': True  # Mark as fee for special handling
+                    'is_fee': True
                 }
                 
                 return [gross_tx, fee_tx]
+            elif transaction_type in ['charge', 'payment']:
+                # For charges without fees, use net amount
+                net_debit = abs(net) if net > 0 else 0
+                net_credit = abs(net) if net < 0 else 0
+                
+                return [{
+                    'id': row.get('id', ''),
+                    'stripe_id': row.get('id', ''),
+                    'date': created.date() if created else (available_on if available_on else None),
+                    'nature': self._map_nature(transaction_type, description),
+                    'party': party,
+                    'debit': net_debit,
+                    'credit': net_credit,
+                    'balance': 0,
+                    'acknowledged': False,
+                    'description': description,
+                    'amount': amount,
+                    'fee': fee,
+                    'net_amount': net,
+                    'currency': row.get('Currency', 'hkd').upper(),
+                    'status': status,
+                    'type': transaction_type,
+                    'created': created,
+                    'available_on': available_on,
+                    'transfer_date': transfer_date,
+                    'account_name': self.company_names.get(company_code, 'Unknown Company'),
+                    'company_code': company_code,
+                    'raw_row': row
+                }]
             else:
                 # Simple transaction for payouts, refunds, etc.
                 if transaction_type == 'payout':
@@ -271,9 +306,10 @@ class CompleteCsvService:
                     debit_amount = abs(amount)
                     credit_amount = 0
                 elif transaction_type == 'refund':
-                    # Refund - money leaving balance
-                    debit_amount = abs(amount)
-                    credit_amount = 0
+                    # Refund - money leaving balance (credit reduces balance)
+                    # Amount is already negative, so we use abs() for credit
+                    debit_amount = 0
+                    credit_amount = abs(amount)
                 else:
                     # Default handling for other transaction types
                     debit_amount = abs(amount) if amount > 0 else 0
@@ -436,11 +472,8 @@ class CompleteCsvService:
             credit = Decimal(str(tx['credit']))
             transfer_date = tx.get('transfer_date')
             
-            # Special handling for fees - they reduce the balance even though they're debits
-            if tx.get('is_fee', False):
-                running_balance -= debit  # Fees reduce balance
-            else:
-                running_balance += debit - credit
+            # Standard debit/credit logic: debits increase balance, credits decrease balance
+            running_balance += debit - credit
             
             tx['balance'] = float(running_balance)
             
@@ -515,7 +548,7 @@ class CompleteCsvService:
                     charges_gross += Decimal(str(tx['debit']))
             elif tx['type'] == 'fee' or tx.get('is_fee'):
                 # Use absolute value for fees to ensure proper calculation
-                charges_fees += abs(Decimal(str(tx['debit'])))
+                charges_fees += abs(Decimal(str(tx['credit'])))
             elif tx['type'] == 'refund':
                 refunds_count += 1
                 refunds_gross += Decimal(str(tx['debit']))
@@ -539,7 +572,7 @@ class CompleteCsvService:
                     ending_charges_gross += Decimal(str(tx['debit']))
             elif tx['type'] == 'fee' or tx.get('is_fee'):
                 # Use absolute value for fees
-                ending_charges_fees += abs(Decimal(str(tx['debit'])))
+                ending_charges_fees += abs(Decimal(str(tx['credit'])))
             elif tx['type'] == 'payout_failure':
                 ending_payout_reversals_count += 1
                 ending_payout_reversals_gross += Decimal(str(tx['debit']))
@@ -547,7 +580,7 @@ class CompleteCsvService:
         # Calculate total paid out with proper precision
         total_paid_out = (
             charges_gross 
-            - charges_fees  # Already using absolute value
+            - charges_fees  # Subtract fees from gross amounts
             + refunds_gross 
             + payout_reversals_gross
         )
@@ -722,10 +755,8 @@ class CompleteCsvService:
                     debit = Decimal(str(tx['debit']))
                     credit = Decimal(str(tx['credit']))
                     
-                    if tx.get('is_fee', False):
-                        running_balance -= debit
-                    else:
-                        running_balance += debit - credit
+                    # Standard debit/credit logic: debits increase balance, credits decrease balance
+                    running_balance += debit - credit
                 else:
                     break  # Stop when we reach the target month
             

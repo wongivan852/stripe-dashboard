@@ -4,7 +4,14 @@ A comprehensive Flask-based web application for analyzing Stripe transaction dat
 
 **📍 Repository**: [wongivan852/stripe-dashboard](https://github.com/wongivan852/stripe-dashboard)
 
-## 🆕 Recent Updates (December 2025)
+## 🆕 Recent Updates (August 2025)
+
+### ✅ Major Transaction Processing & Balance Reconciliation Fixes
+- **Krystal Technology Transfer Date Correction**: Fixed 12 transactions from March 2023 onwards with incorrect transfer dates
+- **Refund Processing Fix**: Corrected refunds to properly reduce account balance (appear as credits)
+- **Monthly Balance Carry Forward**: Fixed opening balance calculation to properly carry closing balances between months
+- **Transaction Format Restoration**: Restored gross amount + processing fee display format matching deployed version
+- **Backup File Exclusion**: Prevented duplicate processing of backup CSV files
 
 ### ✅ Enhanced Balance Carry-Forward & Date Field Analysis
 - **Fixed Balance Continuity**: Resolved November 2021 → December 2021 carry-forward issue (HK$45.95)
@@ -260,6 +267,14 @@ For support and questions:
 - Email: support@example.com
 
 ## 🔄 Changelog
+
+### v2.2.0 (August 2025) - Transaction Processing & Balance Fixes
+- ✅ **Krystal Technology Transfer Date Fix** - Corrected 12 transactions from March 2023 onwards with wrong transfer dates
+- ✅ **Refund Logic Correction** - Fixed refunds to appear as credits (reducing balance) instead of debits
+- ✅ **Monthly Carry Forward Fix** - Opening balances now properly inherit from previous month's closing balance
+- ✅ **Transaction Display Format** - Restored gross charge + processing fee format matching deployed PDF
+- ✅ **Backup File Prevention** - Excluded backup CSV files from duplicate processing
+- ✅ **Balance Accuracy Verification** - September 2022: $1.47, April 2023: -$28.77 (correct deficit)
 
 ### v2.1.0 (December 2025) - Balance Reconciliation & Date Analysis
 - ✅ **Fixed balance carry-forward between months** - November 2021 → December 2021 continuity restored
