@@ -1,9 +1,10 @@
-from flask import Blueprint, jsonify, render_template_string, request, Response
+from flask import Blueprint, jsonify, render_template_string, render_template, request, Response
 from app import db
 from app.models import StripeAccount, Transaction
 from sqlalchemy import func, text
 from datetime import datetime, timedelta
 from app.services.csv_transaction_service import CSVTransactionService
+from app.services.customer_subscription_service import CustomerSubscriptionService
 import json
 import csv
 import io
@@ -4624,3 +4625,88 @@ def payout_reconciliation_interface():
     '''
     
     return html
+
+# Customer Subscription Analytics Routes
+@analytics_bp.route("/customer-subscriptions")
+def customer_subscriptions():
+    """Customer subscription analytics dashboard"""
+    return render_template('analytics/customer_subscriptions.html')
+
+
+@analytics_bp.route("/api/customer-subscriptions")
+def api_customer_subscriptions():
+    """API endpoint for customer subscription analytics"""
+    try:
+        company_filter = request.args.get("company")
+        subscription_service = CustomerSubscriptionService()
+        
+        analytics_data = subscription_service.get_customer_analytics(company_filter)
+        
+        return jsonify({
+            "success": True,
+            "data": analytics_data
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in customer subscription analytics: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@analytics_bp.route("/api/customer-details/<customer_id>")
+def api_customer_details(customer_id):
+    """Get detailed information for a specific customer"""
+    try:
+        subscription_service = CustomerSubscriptionService()
+        customer_details = subscription_service.get_customer_details(customer_id)
+        
+        if not customer_details:
+            return jsonify({
+                "success": False,
+                "error": "Customer not found"
+            }), 404
+        
+        return jsonify({
+            "success": True,
+            "data": customer_details
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting customer details for {customer_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@analytics_bp.route("/api/export-customer-subscriptions")
+def export_customer_subscriptions():
+    """Export customer subscription data to CSV"""
+    try:
+        company_filter = request.args.get("company")
+        subscription_service = CustomerSubscriptionService()
+        
+        csv_content = subscription_service.export_customer_data_csv(company_filter)
+        
+        date_str = datetime.now().strftime("%Y%m%d")
+        filename = f"customer_subscriptions_{company_filter or 'all'}_{date_str}.csv"
+        
+        response = Response(
+            csv_content,
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename=\"{filename}\"",
+                "Content-Type": "text/csv; charset=utf-8"
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error exporting customer subscription data: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500

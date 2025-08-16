@@ -16,6 +16,18 @@
             </a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="{{ url_for('main.dashboard') }}">Dashboard</a>
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="analyticsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Analytics
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="analyticsDropdown">
+                        <li><a class="dropdown-item" href="{{ url_for('analytics.dashboard') }}">📈 Analytics Overview</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('analytics.monthly_statement_view') }}">📄 Monthly Statements</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('analytics.payout_reconciliation_view') }}">💰 Payout Reconciliation</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('analytics.customer_subscriptions_view') }}">👥 Customer Subscriptions</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>

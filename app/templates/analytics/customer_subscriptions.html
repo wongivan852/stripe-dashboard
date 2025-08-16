@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Subscription Analytics - Stripe Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-links {
+            margin-top: 1rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-links a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            background: rgba(102, 126, 234, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            background: rgba(102, 126, 234, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls h3 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 1rem;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-item label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .filter-item select, .filter-item button {
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .filter-item select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-export {
+            background: linear-gradient(135deg, #fd7e14 0%, #e83e8c 100%);
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .summary-card .number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-card .label {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-container h3 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .customers-table {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .table-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+        }
+
+        .table-header h3 {
+            margin: 0;
+        }
+
+        .table-controls {
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .search-box {
+            flex: 1;
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 600px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover {
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-at-risk {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filter-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .summary-cards {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Customer Subscription Analytics</h1>
+        <div class="nav-links">
+            <a href="/">🏠 Home</a>
+            <a href="/analytics/dashboard">📈 Analytics</a>
+            <a href="/analytics/monthly-statement">📄 Monthly Statements</a>
+            <a href="/analytics/payout-reconciliation">💰 Payout Reconciliation</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <h3>🔍 Filters & Controls</h3>
+            <div class="filter-group">
+                <div class="filter-item">
+                    <label for="companyFilter">Company</label>
+                    <select id="companyFilter">
+                        <option value="">All Companies</option>
+                        <option value="cgge">CGGE</option>
+                        <option value="ki">Krystal Institute</option>
+                        <option value="kt">Krystal Technology</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <button class="btn" onclick="loadData()">🔄 Refresh Data</button>
+                </div>
+                <div class="filter-item">
+                    <button class="btn btn-export" onclick="exportData()">📥 Export CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">Loading customer data...</div>
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="content" style="display: none;">
+            <!-- Summary Cards -->
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="number" id="totalCustomers">0</div>
+                    <div class="label">Total Customers</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number" id="totalRevenue">HK$0</div>
+                    <div class="label">Total Revenue</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number" id="activeCustomers">0</div>
+                    <div class="label">Active Customers</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number" id="subscriptionRate">0%</div>
+                    <div class="label">Subscription Rate</div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="dashboard-grid">
+                <div class="chart-container">
+                    <h3>📈 Revenue Trends</h3>
+                    <canvas id="revenueTrendChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>🎯 Subscription Plans</h3>
+                    <canvas id="planDistributionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Customer Table -->
+            <div class="customers-table">
+                <div class="table-header">
+                    <h3>👥 Customer Details</h3>
+                </div>
+                <div class="table-controls">
+                    <input type="text" class="search-box" id="searchBox" placeholder="Search customers by email, ID, or plan..." onkeyup="filterTable()">
+                    <span id="customerCount">0 customers</span>
+                </div>
+                <div class="table-wrapper">
+                    <table id="customersTable">
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Email</th>
+                                <th>Plans</th>
+                                <th>Total Spent</th>
+                                <th>Purchases</th>
+                                <th>Avg Order</th>
+                                <th>Last Purchase</th>
+                                <th>Status</th>
+                                <th>Companies</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customersTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+        let revenueTrendChart = null;
+        let planDistributionChart = null;
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+        });
+
+        async function loadData() {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const content = document.getElementById('content');
+            
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            content.style.display = 'none';
+            
+            try {
+                const company = document.getElementById('companyFilter').value;
+                const url = `/analytics/api/customer-subscriptions${company ? `?company=${company}` : ''}`;
+                
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error);
+                }
+                
+                currentData = result.data;
+                updateSummaryCards(currentData.summary);
+                updateCharts(currentData);
+                updateCustomersTable(currentData.customers);
+                
+                loading.style.display = 'none';
+                content.style.display = 'block';
+                
+            } catch (err) {
+                console.error('Error loading data:', err);
+                error.textContent = `Error loading data: ${err.message}`;
+                error.style.display = 'block';
+                loading.style.display = 'none';
+            }
+        }
+
+        function updateSummaryCards(summary) {
+            document.getElementById('totalCustomers').textContent = summary.total_customers.toLocaleString();
+            document.getElementById('totalRevenue').textContent = `HK$${summary.net_revenue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('activeCustomers').textContent = summary.active_customers.toLocaleString();
+            document.getElementById('subscriptionRate').textContent = `${summary.subscription_rate.toFixed(1)}%`;
+        }
+
+        function updateCharts(data) {
+            // Revenue Trend Chart
+            if (revenueTrendChart) revenueTrendChart.destroy();
+            
+            const ctx1 = document.getElementById('revenueTrendChart').getContext('2d');
+            revenueTrendChart = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: data.revenue_trends.map(t => t.month),
+                    datasets: [{
+                        label: 'Revenue (HKD)',
+                        data: data.revenue_trends.map(t => t.revenue),
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'New Customers',
+                        data: data.revenue_trends.map(t => t.new_customers),
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Revenue (HKD)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'New Customers'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        }
+                    }
+                }
+            });
+
+            // Plan Distribution Chart
+            if (planDistributionChart) planDistributionChart.destroy();
+            
+            const ctx2 = document.getElementById('planDistributionChart').getContext('2d');
+            planDistributionChart = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: data.plan_analytics.map(p => p.plan_name),
+                    datasets: [{
+                        data: data.plan_analytics.map(p => p.revenue),
+                        backgroundColor: [
+                            '#667eea', '#28a745', '#fd7e14', '#e83e8c', 
+                            '#20c997', '#6f42c1', '#e91e63', '#795548'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateCustomersTable(customers) {
+            const tbody = document.getElementById('customersTableBody');
+            const customerCount = document.getElementById('customerCount');
+            
+            tbody.innerHTML = '';
+            
+            customers.forEach(customer => {
+                const row = document.createElement('tr');
+                
+                const statusClass = customer.status.toLowerCase().replace(' ', '-');
+                const planNames = customer.subscription_plans_display.join(', ') || 'N/A';
+                const lastPurchase = customer.last_purchase ? 
+                    new Date(customer.last_purchase).toLocaleDateString() : 'N/A';
+                
+                row.innerHTML = `
+                    <td><strong>${customer.customer_id}</strong></td>
+                    <td>${customer.email || 'N/A'}</td>
+                    <td><small>${planNames}</small></td>
+                    <td><strong>HK$${customer.net_spent.toLocaleString('en-US', {minimumFractionDigits: 2})}</strong></td>
+                    <td>${customer.purchase_count} (${customer.refund_count} refunds)</td>
+                    <td>HK$${customer.avg_order_value.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    <td>${lastPurchase}</td>
+                    <td><span class="status-badge status-${statusClass}">${customer.status}</span></td>
+                    <td><small>${customer.companies.join(', ')}</small></td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+            
+            customerCount.textContent = `${customers.length} customers`;
+        }
+
+        function filterTable() {
+            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+            const rows = document.querySelectorAll('#customersTableBody tr');
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            document.getElementById('customerCount').textContent = `${visibleCount} customers (filtered)`;
+        }
+
+        function exportData() {
+            const company = document.getElementById('companyFilter').value;
+            const url = `/analytics/api/export-customer-subscriptions${company ? `?company=${company}` : ''}`;
+            window.open(url, '_blank');
+        }
+    </script>
+</body>
+</html>
