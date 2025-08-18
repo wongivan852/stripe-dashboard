@@ -13,7 +13,7 @@ Group=www-data
 RuntimeDirectory=stripe-dashboard
 RuntimeDirectoryMode=755
 WorkingDirectory=/opt/stripe-dashboard
-ExecStart=/opt/stripe-dashboard/venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 3 --timeout 120 --keep-alive 2 --max-requests 1000 --max-requests-jitter 100 --access-logfile /var/log/stripe-dashboard/access.log --error-logfile /var/log/stripe-dashboard/error.log --capture-output --enable-stdio-inheritance wsgi:application
+ExecStart=/opt/stripe-dashboard/venv/bin/gunicorn --bind 0.0.0.0:8081 --workers 3 --timeout 120 --keep-alive 2 --max-requests 1000 --max-requests-jitter 100 --access-logfile /var/log/stripe-dashboard/access.log --error-logfile /var/log/stripe-dashboard/error.log --capture-output --enable-stdio-inheritance wsgi:application
 ExecReload=/bin/kill -s HUP $MAINPID
 ExecStop=/bin/kill -s TERM $MAINPID
 Restart=always
@@ -44,7 +44,7 @@ LimitNPROC=4096
 TimeoutStartSec=60
 TimeoutStopSec=30
 TimeoutAbortSec=30
-WatchdogSec=30
+WatchdogSec=120
 
 [Install]
 WantedBy=multi-user.target

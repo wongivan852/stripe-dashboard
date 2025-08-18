@@ -1,4 +1,4 @@
-# Stripe Dashboard - Installation Summary
+# Stripe Dashboard - Production Installation Summary
 
 ## 📋 Installation Overview
 
@@ -8,6 +8,8 @@ This document provides a comprehensive summary of the successful installation an
 **Installation Status**: ✅ **COMPLETED SUCCESSFULLY**  
 **Server IP**: 192.168.0.104  
 **Application URL**: http://192.168.0.104  
+**Application Port**: 8081 (internal)  
+**Test Data**: 116 transactions across 3 companies loaded  
 
 ---
 
@@ -42,15 +44,12 @@ sudo ./scripts/install-production-deps.sh
 | Directory Structure | ✅ Required paths | ✅ **CREATED** | All directories with correct ownership |
 | Python Virtual Environment | ✅ Required | ✅ **CONFIGURED** | Isolated environment with dependencies |
 | Application Files | ✅ Required | ✅ **DEPLOYED** | Source code copied to `/opt/stripe-dashboard/` |
-| Environment Configuration | ✅ Required | ✅ **CONFIGURED** | Production `.env` file created |
+| Environment Configuration | ✅ Required | ✅ **CONFIGURED** | Production `.env` file with PORT=8081 |
 | Database Initialization | ✅ Required | ✅ **COMPLETED** | SQLite tables created successfully |
 | Systemd Service | ✅ Required | ✅ **INSTALLED** | Auto-start service configured |
 | Nginx Configuration | ✅ Required | ✅ **CONFIGURED** | Reverse proxy with security headers |
 
 **Installation Command Used**:
-```bash
-sudo ./scripts/deploy.sh
-```
 
 **Status**: ✅ Successfully completed with database path corrections and service configuration.
 
@@ -108,7 +107,28 @@ sudo ./scripts/deploy.sh
 └── stripe_dashboard.log                  # Application Log
 
 /var/lib/stripe-dashboard/                # Application Data
-└── production.db                         # SQLite Database
+└── production.db                         # SQLite Database (116 test transactions)
+```
+
+### **Test Data Import**
+
+**Status**: ✅ **COMPLETED**  
+**Total Records**: 116 transactions across 3 companies  
+**Import Date**: August 18, 2025  
+
+| Company | Transactions | Total Amount | Date Range |
+|---------|-------------|-------------|------------|
+| CGGE Media | 46 transactions | 602.06 HKD | Nov 2021 - Jul 2025 |
+| Krystal Intelligence | 39 transactions | 1,523.24 HKD | Jul 2023 - Jul 2025 |
+| Krystal Technologies | 31 transactions | 105.04 HKD | Sep 2022 - Jul 2025 |
+
+**Data Sources**: 
+- `complete_csv/cgge_2021_Nov-2025_Jul.csv`
+- `complete_csv/ki_2023_Jul-2025_Jul.csv` 
+- `complete_csv/kt_2022_Sept-2025_Jul.csv`
+
+**Import Script**: `import_test_data.py` (handles amount parsing, datetime conversion, account creation)
+```
 
 /var/backups/stripe-dashboard/            # Automated Backups
 └── stripe-dashboard-YYYYMMDD-HHMMSS/    # Daily Backup Directories
@@ -238,6 +258,34 @@ To                         Action      From
 
 ---
 
+## 🌐 Application Access
+
+### **Main Dashboard**
+- **URL**: http://192.168.0.104
+- **Features**: Balance reconciliation testing, monthly statements, payout reconciliation
+- **Test Data**: Ready with 116 real transactions for testing
+
+### **Analytics Endpoints**
+- **Simple Analytics**: http://192.168.0.104/analytics/simple
+- **Monthly Statement Generator**: http://192.168.0.104/analytics/monthly-statement  
+- **Payout Reconciliation**: http://192.168.0.104/analytics/payout-reconciliation
+
+### **API Endpoints**
+- **Monthly Statement API**: `/analytics/api/monthly-statement?company=cgge&year=2025&month=7`
+- **Payout Reconciliation API**: `/analytics/api/payout-reconciliation?company=cgge&year=2025&month=7`
+
+### **Quick Test Commands**
+```bash
+# Test application health
+curl -I http://192.168.0.104
+# Test direct application port
+curl -I http://127.0.0.1:8081
+# Check application logs
+sudo tail -f /var/log/stripe-dashboard/error.log
+```
+
+---
+
 ## 📝 Management Commands
 
 ### **Service Management**
@@ -307,7 +355,51 @@ sudo du -h /var/lib/stripe-dashboard/production.db
 
 ---
 
-## 📞 Support & Troubleshooting
+## �️ Troubleshooting Guide
+
+### **Common Issues & Solutions**
+
+#### **502 Bad Gateway Error**
+**Symptoms**: Nginx returns 502 Bad Gateway when accessing the application
+**Root Cause**: Systemd watchdog timeout too aggressive (30s) killing slow-starting application
+**Solution**:
+```bash
+# Increase watchdog timeout
+sudo sed -i 's/WatchdogSec=30/WatchdogSec=120/' /etc/systemd/system/stripe-dashboard.service
+sudo systemctl daemon-reload
+sudo systemctl restart stripe-dashboard
+```
+
+#### **Port Configuration Changes**
+**To change the application port** (currently 8081):
+1. Update environment file: `sudo nano /opt/stripe-dashboard/.env` → Change `PORT=8081`
+2. Update systemd service: `sudo nano /etc/systemd/system/stripe-dashboard.service` → Update gunicorn bind
+3. Update nginx proxy: `sudo nano /etc/nginx/sites-available/stripe-dashboard` → Update proxy_pass
+4. Update firewall: `sudo ufw delete allow [old_port]` → `sudo ufw allow [new_port]`
+5. Reload services: `sudo systemctl daemon-reload && sudo systemctl restart stripe-dashboard nginx`
+
+#### **Service Status Checks**
+```bash
+# Check all service status
+sudo systemctl status stripe-dashboard nginx fail2ban
+# Check port usage
+sudo ss -tlnp | grep 8081
+# Check logs
+sudo journalctl -u stripe-dashboard -f
+sudo tail -f /var/log/stripe-dashboard/error.log
+```
+
+#### **Database Issues**
+```bash
+# Check database permissions
+sudo ls -la /var/lib/stripe-dashboard/
+# Reinitialize if needed
+cd /opt/stripe-dashboard && sudo -u www-data ./venv/bin/python init_db.py
+```
+
+---
+
+## �📞 Support & Troubleshooting
 
 ### **Common Issues & Solutions**
 
