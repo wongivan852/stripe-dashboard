@@ -72,7 +72,7 @@ sudo ./scripts/deploy.sh
 | 22 | SSH | Open | ✅ Active |
 | 80 | HTTP (Nginx) | Open | ✅ Active |
 | 443 | HTTPS | Open | ✅ Ready |
-| 5000 | Flask App | Private Networks Only | ✅ Active |
+| 8081 | Flask App | Private Networks Only | ✅ Active |
 
 ### **Security Features Implemented**
 - ✅ **Firewall Protection**: UFW configured with restrictive rules
@@ -223,7 +223,7 @@ To                         Action      From
 22/tcp                     ALLOW       Anywhere                  
 80/tcp                     ALLOW       Anywhere                  
 443                        ALLOW       Anywhere                  
-5000                       ALLOW       192.168.0.0/16 (Private)
+8081                       ALLOW       192.168.0.0/16 (Private)
 ```
 
 ### **Fail2ban Configuration**

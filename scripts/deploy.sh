@@ -189,7 +189,7 @@ FLASK_DEBUG=False
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 DATABASE_URL=sqlite:///$DATA_DIR/production.db
 HOST=0.0.0.0
-PORT=5000
+PORT=8081
 LOG_LEVEL=INFO
 EOF
         fi
@@ -270,7 +270,7 @@ server {
     location / {
         limit_req zone=app burst=20 nodelay;
         
-        proxy_pass http://127.0.0.1:5000;
+        proxy_pass http://127.0.0.1:8081;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -355,7 +355,7 @@ setup_firewall() {
     ufw allow https
     
     # Allow specific network access (adjust as needed)
-    ufw allow from 192.168.0.0/16 to any port 5000
+    ufw allow from 192.168.0.0/16 to any port 8081
     
     # Enable firewall
     ufw --force enable
