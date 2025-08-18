@@ -106,8 +106,8 @@ install_dependencies() {
         fail2ban \
         ufw
     
-    # Install Gunicorn system-wide
-    pip3 install gunicorn
+    # Install Gunicorn system-wide (using apt instead of pip)
+    apt-get install -y python3-gunicorn || true
     
     log "System dependencies installed"
 }
@@ -251,6 +251,11 @@ EOF
 configure_nginx() {
     log "Configuring Nginx..."
     
+    # First, add rate limiting to the http block in main nginx.conf
+    if ! grep -q "limit_req_zone.*zone=app" /etc/nginx/nginx.conf; then
+        sed -i '/http {/a\\tlimit_req_zone $binary_remote_addr zone=app:10m rate=10r/m;' /etc/nginx/nginx.conf
+    fi
+    
     # Create nginx configuration
     cat > "/etc/nginx/sites-available/$APP_NAME" << EOF
 server {
@@ -261,9 +266,6 @@ server {
     add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
-    
-    # Rate limiting
-    limit_req_zone \$binary_remote_addr zone=app:10m rate=10r/m;
     
     location / {
         limit_req zone=app burst=20 nodelay;
