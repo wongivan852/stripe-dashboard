@@ -248,13 +248,17 @@ def export_pdf():
         table_data = [['Date', 'Nature', 'Party', 'Debit', 'Credit', 'Balance', 'Ack', 'Description']]
         
         # Opening balance row
+        opening_balance = statement['opening_balance']
+        opening_debit = f"HK${abs(opening_balance):.2f}" if opening_balance < 0 else ""
+        opening_credit = f"HK${abs(opening_balance):.2f}" if opening_balance >= 0 else ""
+        
         table_data.append([
             f"{year}-{month:02d}-01",
             "Opening Balance", 
             "Brought Forward",
-            "",
-            "",
-            f"HK${statement['opening_balance']:.2f}",
+            opening_debit,
+            opening_credit,
+            f"HK${opening_balance:.2f}",
             "Yes",
             f"Opening balance for {month_names[month]} {year}"
         ])
@@ -290,13 +294,17 @@ def export_pdf():
         ])
         
         # Closing balance row
+        closing_balance = statement['closing_balance']
+        closing_debit = f"HK${abs(closing_balance):.2f}" if closing_balance < 0 else ""
+        closing_credit = f"HK${abs(closing_balance):.2f}" if closing_balance >= 0 else ""
+        
         table_data.append([
             f"{year}-{month:02d}-31",
             "Closing Balance",
             "Carry Forward",
-            "",
-            "",
-            f"HK${statement['closing_balance']:.2f}",
+            closing_debit,
+            closing_credit,
+            f"HK${closing_balance:.2f}",
             "Yes",
             f"Closing balance for {month_names[month]} {year}"
         ])
@@ -407,13 +415,17 @@ def export_csv_statement():
                       'July', 'August', 'September', 'October', 'November', 'December']
         
         # Opening balance row
+        opening_balance = statement['opening_balance']
+        opening_debit = f"{abs(opening_balance):.2f}" if opening_balance < 0 else ""
+        opening_credit = f"{abs(opening_balance):.2f}" if opening_balance >= 0 else ""
+        
         writer.writerow([
             f"{year}-{month:02d}-01",
             "Opening Balance",
             "Brought Forward",
-            "",
-            "",
-            f"{statement['opening_balance']:.2f}",
+            opening_debit,
+            opening_credit,
+            f"{opening_balance:.2f}",
             "Yes",
             f"Opening balance for {month_names[month]} {year}"
         ])
@@ -449,13 +461,17 @@ def export_csv_statement():
         ])
         
         # Closing balance row
+        closing_balance = statement['closing_balance']
+        closing_debit = f"{abs(closing_balance):.2f}" if closing_balance < 0 else ""
+        closing_credit = f"{abs(closing_balance):.2f}" if closing_balance >= 0 else ""
+        
         writer.writerow([
             f"{year}-{month:02d}-31",
             "Closing Balance",
             "Carry Forward",
-            "",
-            "",
-            f"{statement['closing_balance']:.2f}",
+            closing_debit,
+            closing_credit,
+            f"{closing_balance:.2f}",
             "Yes",
             f"Closing balance for {month_names[month]} {year}"
         ])
@@ -4286,8 +4302,8 @@ def monthly_statement_interface():
                                     <td>${statement.year}-${statement.month.toString().padStart(2, '0')}-01</td>
                                     <td>Opening Balance</td>
                                     <td>Brought Forward</td>
-                                    <td></td>
-                                    <td></td>
+                                    <td>${statement.opening_balance < 0 ? `HK$${Math.abs(statement.opening_balance).toFixed(2)}` : ''}</td>
+                                    <td>${statement.opening_balance >= 0 ? `HK$${Math.abs(statement.opening_balance).toFixed(2)}` : ''}</td>
                                     <td>HK$${statement.opening_balance.toFixed(2)}</td>
                                     <td>Yes</td>
                                     <td>Opening balance for ${monthNames[statement.month]} ${statement.year}</td>
@@ -4327,8 +4343,8 @@ def monthly_statement_interface():
                                     <td>${statement.year}-${statement.month.toString().padStart(2, '0')}-31</td>
                                     <td>Closing Balance</td>
                                     <td>Carry Forward</td>
-                                    <td></td>
-                                    <td></td>
+                                    <td>${statement.closing_balance < 0 ? `HK$${Math.abs(statement.closing_balance).toFixed(2)}` : ''}</td>
+                                    <td>${statement.closing_balance >= 0 ? `HK$${Math.abs(statement.closing_balance).toFixed(2)}` : ''}</td>
                                     <td>HK$${statement.closing_balance.toFixed(2)}</td>
                                     <td>Yes</td>
                                     <td>Closing balance for ${monthNames[statement.month]} ${statement.year}</td>

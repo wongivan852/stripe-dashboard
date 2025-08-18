@@ -391,7 +391,22 @@ class CompleteCsvService:
             return transaction_type.title()
     
     def _extract_party_from_metadata(self, row):
-        """Extract customer reference from metadata fields"""
+        """Extract customer reference from metadata fields, prioritizing email addresses"""
+        # First, check for email fields in the CSV
+        email_fields = [
+            'Customer Email',
+            'customer_email', 
+            'email',
+            'Email',
+            'customer_email (metadata)',
+            'email (metadata)'
+        ]
+        
+        for field in email_fields:
+            email = row.get(field, '').strip()
+            if email and '@' in email:
+                return email
+        
         # Check for userID in metadata
         user_id = row.get('userID (metadata)', '').strip()
         if user_id:
@@ -411,11 +426,11 @@ class CompleteCsvService:
         return None
     
     def _extract_party_from_description(self, description):
-        """Extract customer reference from description"""
+        """Extract customer reference from description, prioritizing email addresses"""
         if not description:
             return "N/A"
         
-        # Look for email pattern
+        # Look for email pattern (prioritized)
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         emails = re.findall(email_pattern, description)
         if emails:
@@ -657,13 +672,17 @@ class CompleteCsvService:
             writer.writerow(header)
             
             # Write opening balance row
+            opening_balance = statement_data['opening_balance']
+            opening_debit = f"{abs(opening_balance):.2f}" if opening_balance < 0 else ""
+            opening_credit = f"{abs(opening_balance):.2f}" if opening_balance >= 0 else ""
+            
             writer.writerow([
                 f"{statement_data['year']}-{statement_data['month']:02d}-01",
                 "Opening Balance",
                 "Brought Forward",
-                "",
-                "",
-                f"{statement_data['opening_balance']:.2f}",
+                opening_debit,
+                opening_credit,
+                f"{opening_balance:.2f}",
                 "Yes",
                 f"Opening balance for {statement_data['month']}/{statement_data['year']}"
             ])
@@ -682,13 +701,17 @@ class CompleteCsvService:
                 ])
             
             # Write closing balance row
+            closing_balance = statement_data['closing_balance']
+            closing_debit = f"{abs(closing_balance):.2f}" if closing_balance < 0 else ""
+            closing_credit = f"{abs(closing_balance):.2f}" if closing_balance >= 0 else ""
+            
             writer.writerow([
                 f"{statement_data['year']}-{statement_data['month']:02d}-{self._get_last_day_of_month(statement_data['year'], statement_data['month']):02d}",
                 "Closing Balance",
                 "Carry Forward",
-                "",
-                "",
-                f"{statement_data['closing_balance']:.2f}",
+                closing_debit,
+                closing_credit,
+                f"{closing_balance:.2f}",
                 "Yes",
                 f"Closing balance for {statement_data['month']}/{statement_data['year']}"
             ])
