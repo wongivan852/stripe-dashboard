@@ -84,7 +84,8 @@ def main():
         # Open http://localhost:8081 for setup instructions
         
         app = create_minimal_app()
-        app.run(debug=True, host='0.0.0.0', port=8081)
+        port = int(os.getenv('APP_PORT', 8082))
+        app.run(debug=True, host='0.0.0.0', port=port)
         return
     
     # Try to import the full app
@@ -106,13 +107,15 @@ def main():
                 # Database warning suppressed for production
                 pass
         
-        app.run(debug=True, host='0.0.0.0', port=8081)
+        port = int(os.getenv('APP_PORT', 8082))
+        app.run(debug=True, host='0.0.0.0', port=port)
         
     except ImportError as e:
         # Import error - starting setup mode
         
         app = create_minimal_app()
-        app.run(debug=True, host='0.0.0.0', port=8081)
+        port = int(os.getenv('APP_PORT', 8082))
+        app.run(debug=True, host='0.0.0.0', port=port)
     
     except Exception as e:
         # Error - please check configuration

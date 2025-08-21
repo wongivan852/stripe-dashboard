@@ -38,6 +38,21 @@ def create_app():
     # Import models (important to do this before registering blueprints)
     from app.models import StripeAccount, Transaction
     
+    # Register health check blueprint
+    try:
+        from app.health import health_bp
+        app.register_blueprint(health_bp)
+        print("✅ Health check blueprint registered successfully")
+    except ImportError as e:
+        print(f"❌ Health check blueprint import failed: {e}")
+        # Create basic health endpoint as fallback
+        @app.route('/health')
+        def basic_health():
+            return jsonify({
+                'status': 'ok',
+                'timestamp': datetime.now().isoformat()
+            }), 200
+    
     # Main routes
     @app.route('/')
     def index():
@@ -86,6 +101,7 @@ def create_app():
                 <button onclick="window.open('/analytics/simple', '_blank')">Simple Analytics</button>
                 <button onclick="window.open('/analytics/monthly-statement', '_blank')">Monthly Generator</button>
                 <button onclick="window.open('/analytics/payout-reconciliation', '_blank')">Payout Reconciliation</button>
+                <button onclick="window.open('/health', '_blank')" class="api-button">Health Check</button>
             </div>
             
             <script>
@@ -321,6 +337,7 @@ def create_app():
                             <a href="/analytics/simple" class="nav-link">📋 Simple View</a>
                             <a href="/analytics/statement-generator" class="nav-link">📄 Statement Generator</a>
                             <a href="/analytics/api/account-amounts" class="nav-link">🔗 API Data</a>
+                            <a href="/health" class="nav-link">🩺 Health Check</a>
                         </div>
                 '''
                 

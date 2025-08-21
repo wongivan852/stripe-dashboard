@@ -4,3 +4,5 @@ Flask-Migrate==4.0.7
 python-dotenv==1.0.1
 SQLAlchemy==2.0.32
 Werkzeug==3.0.3
+psutil==5.9.5
+gunicorn==21.2.0
