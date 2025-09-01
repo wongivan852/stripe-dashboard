@@ -1,0 +1,239 @@
+id,Created date (UTC),Amount,Amount Refunded,Currency,Captured,Converted Amount,Converted Amount Refunded,Converted Currency,Decline Reason,Description,Fee,Refunded date (UTC),Statement Descriptor,Status,Seller Message,Taxes On Fee,Card ID,Customer ID,Customer Description,Customer Email,Invoice ID,Transfer,userID (metadata),site (metadata),plan_days (metadata),stripe_user (metadata),stripe_plan (metadata)
+ch_3RE9VJHOMTu9eLVo1EWcOexy,2025-04-15 13:26:22,90.00,0.00,cny,true,93.52,0.00,hkd,,,6.00,,KRYSTAL.INSTITUTE,Paid,Payment complete.,0.00,pm_1RE9VHHOMTu9eLVo8zTMfV5E,cus_S8QMu20IS3aGt9,,7788kzds@gmail.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,473,Blender Studio CN,30,,M1
+py_3R5PgBHOMTu9eLVo0IHCx4P8,2025-03-22 12:55:03,90.00,0.00,cny,true,90.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_RzOTpvJ3xGuAWA,,2942669312@qq.com,,,485,Blender Studio CN,30,,M1
+py_3R5Oc8HOMTu9eLVo1M4PlBNT,2025-03-22 11:50:03,90.00,0.00,cny,true,90.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_RzNM0fQacSASyu,,2942669312@qq.com,,,485,Blender Studio CN,30,,M1
+py_3R5PlgHOMTu9eLVo1gkHrjGV,2025-03-22 10:59:29,90.00,0.00,cny,true,94.57,0.00,hkd,,,4.08,,,Paid,Payment complete.,0.00,,cus_RzOYUnVCN7VdIw,,2942669312@qq.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,485,Blender Studio CN,30,,M1
+py_3R4hH0HOMTu9eLVo04SOvgY3,2025-03-20 11:29:06,90.00,0.00,cny,true,94.64,0.00,hkd,,,4.08,,,Paid,Payment complete.,0.00,,cus_RyearFeK77BRsg,,venkic@163.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,480,Blender Studio CN,30,,M1
+py_3R3GwzHOMTu9eLVo1t1gCfEQ,2025-03-16 13:10:10,90.00,0.00,cny,true,94.76,0.00,hkd,,,4.08,,,Paid,Payment complete.,0.00,,cus_RxBJ9IiWtSs2Px,,7788kzds@gmail.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,473,Blender Studio CN,30,,M1
+ch_3QznNFHOMTu9eLVo05Jvy5Qa,2025-03-06 22:58:41,90.00,0.00,cny,true,94.57,0.00,hkd,,,6.04,,KRYSTAL.INSTITUTE,Paid,Payment complete.,0.00,pm_1QznNEHOMTu9eLVovyBRdyln,cus_RtaYp2GctFGKur,,khalidothman89@gmail.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,406,Blender Studio CN,30,,M1
+,2025-02-28 08:09:10,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,7,Blender Studio CN,30,,M1
+,2025-02-22 17:38:25,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,371,Blender Studio CN,30,,M1
+ch_3QuPauHOMTu9eLVo1J7MTGXo,2025-02-20 02:35:08,90.00,0.00,cny,true,94.21,0.00,hkd,,,6.02,,KRYSTAL.INSTITUTE,Paid,Payment complete.,0.00,pm_1QuPbSHOMTu9eLVo2kCubER6,cus_Ro1e0ms7hoglzI,,khalidothman89@gmail.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,406,Blender Studio CN,30,,M1
+,2025-01-30 03:35:19,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,421,Blender Studio CN,30,,M1
+,2025-01-27 13:22:53,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,418,Blender Studio CN,30,,M1
+,2025-01-20 07:38:56,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,407,Blender Studio CN,30,,M1
+ch_3QjBj9HOMTu9eLVo0KMTsy0W,2025-01-20 03:33:08,90.00,0.00,cny,true,93.84,0.00,hkd,,,6.01,,KRYSTAL.INSTITUTE,Paid,Payment complete.,0.00,pm_1QjBjaHOMTu9eLVoUPdhRbdL,cus_RcQaILssEln1oO,,khalidothman89@gmail.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,406,Blender Studio CN,30,,M1
+,2025-01-07 04:57:21,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,399,Blender Studio CN,30,,M1
+py_3Qe6GnHOMTu9eLVo1YsBlGws,2025-01-06 02:43:14,90.00,0.00,cny,true,93.64,0.00,hkd,,,4.06,,,Paid,Payment complete.,0.00,,cus_RXAcPy0qyDpNnf,,1964785842@qq.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,397,Blender Studio CN,30,,M1
+,2025-01-04 12:04:07,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,176,Blender Studio CN,30,,M1
+,2024-12-19 15:49:34,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,380,Blender Studio CN,90,,M3
+,2024-12-19 15:49:16,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,380,Blender Studio CN,365,,Y1
+,2024-12-19 15:48:59,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,380,Blender Studio CN,90,,M3
+,2024-12-19 15:47:53,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,380,Blender Studio CN,30,,M1
+,2024-12-13 02:43:57,540.00,,cny,,,,,,,,,,canceled,,,,,,,,,7,Blender Studio CN,180,,M6
+,2024-12-09 07:33:02,540.00,,cny,,,,,,,,,,canceled,,,,,,,,,7,Blender Studio CN,180,,M6
+,2024-12-09 07:26:54,540.00,,cny,,,,,,,,,,canceled,,,,cus_RMktx0PdIDr5Hu,,admin@email.com,,,7,Blender Studio CN,180,,M6
+,2024-12-09 07:22:26,540.00,,cny,,,,,,,,,,canceled,,,,cus_RMksiFLMMzCXJE,,admin@email.com,,,7,Blender Studio CN,180,,M6
+,2024-12-09 07:21:55,540.00,,cny,,,,,,,,,,canceled,,,,,,,,,7,Blender Studio CN,180,,M6
+,2024-12-04 09:01:55,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,7,Blender Studio CN,90,,M3
+,2024-12-04 09:01:09,540.00,,cny,,,,,,,,,,canceled,,,,,,,,,7,Blender Studio CN,180,,M6
+,2024-11-25 08:19:13,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,312,Blender Studio CN,30,,M1
+,2024-11-25 08:17:08,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,312,Blender Studio CN,365,,Y1
+,2024-11-25 08:13:59,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,312,Blender Studio CN,365,,Y1
+,2024-11-24 10:09:14,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,306,Blender Studio CN,30,,M1
+,2024-11-22 16:11:51,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,296,Blender Studio CN,365,,Y1
+,2024-11-22 09:04:52,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,288,Blender Studio CN,30,,M1
+,2024-11-22 09:04:23,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,288,Blender Studio CN,365,,Y1
+,2024-11-19 10:13:53,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,200,Blender Studio CN,30,,M1
+,2024-11-19 04:22:53,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,198,Blender Studio CN,30,,M1
+,2024-11-19 01:02:57,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,193,Blender Studio CN,30,,M1
+,2024-11-18 15:19:22,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,192,Blender Studio CN,30,,M1
+,2024-11-18 12:15:42,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,190,Blender Studio CN,30,,M1
+,2024-11-18 12:14:46,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,190,Blender Studio CN,30,,M1
+,2024-11-18 09:55:14,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,184,Blender Studio CN,30,,M1
+,2024-11-18 06:03:30,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,174,Blender Studio CN,30,,M1
+,2024-11-17 07:34:09,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,170,Blender Studio CN,30,,M1
+,2024-11-16 08:27:38,90.00,,cny,,,,,,,,,,canceled,,,,cus_RE9g2eDbai3QSY,,95059155@qq.com,,,169,Blender Studio CN,30,,M1
+,2024-11-16 08:24:09,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,169,Blender Studio CN,30,,M1
+,2024-11-16 08:14:02,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,169,Blender Studio CN,30,,M1
+,2024-11-15 10:28:56,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,168,Blender Studio CN,365,,Y1
+,2024-11-09 18:03:37,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,148,Blender Studio CN,30,,M1
+py_3QARn5HOMTu9eLVo0eZkt9d4,2024-10-16 09:40:03,90.00,0.00,cny,true,90.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_R2WrSSHWMJqzoo,,Pipeline.PG10@gmail.com,,,126,Blender Studio CN,30,,M1
+py_3Q9u0AHOMTu9eLVo0KFQc9nu,2024-10-14 19:33:22,90.00,0.00,cny,true,96.61,0.00,hkd,,,4.13,,,Paid,Payment complete.,0.00,,cus_R1xw5MY9ZwpliQ,,yywsjnz@qq.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,121,Blender Studio CN,30,,M1
+,2024-10-14 17:56:51,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,121,Blender Studio CN,30,,M1
+,2024-10-03 18:40:11,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,102,Blender Studio CN,30,,M1
+,2024-10-01 14:40:49,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,101,Blender Studio CN,30,,M1
+py_3Q1JmFHOMTu9eLVo0T4vuhHk,2024-09-21 03:15:14,90.00,0.00,cny,true,97.44,0.00,hkd,,,4.14,,,Paid,Payment complete.,0.00,,cus_Qt5yKruGvyBsrB,,wolf00shi@163.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,95,Blender Studio CN,30,,M1
+,2024-09-11 07:40:33,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,92,Blender Studio CN,30,,M1
+,2024-09-06 08:59:46,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,90,Blender Studio CN,30,,M1
+,2024-08-18 09:45:10,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,78,Blender Studio CN,30,,M1
+py_3PlwUuHOMTu9eLVo0LEY20SI,2024-08-09 17:21:45,90.00,0.00,cny,true,95.96,0.00,hkd,,,4.11,,,Paid,Payment complete.,0.00,,cus_QdCuGn7cFwIT6A,,1305547501@qq.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,75,Blender Studio CN,30,,M1
+py_3Pl1PdHOMTu9eLVo1PY8QeHm,2024-08-07 04:24:34,90.00,0.00,cny,true,95.75,0.00,hkd,,,4.11,,,Paid,Payment complete.,0.00,,cus_QcFvXp6QV9qP1o,,cosmolin216@qq.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,73,Blender Studio CN,30,,M1
+py_3PaCqQHOMTu9eLVo1epbSzP7,2024-07-08 08:23:43,90.00,0.00,cny,true,94.79,0.00,hkd,,,4.09,,,Paid,Payment complete.,0.00,,cus_QR50ZZKmKOU6Dq,,2368644054@qq.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,63,Blender Studio CN,30,,M1
+,2024-06-24 16:57:51,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,58,Blender Studio CN,30,,M1
+,2024-06-24 16:34:36,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,58,Blender Studio CN,30,,M1
+,2024-06-23 04:11:25,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,57,Blender Studio CN,30,,M1
+py_3PTm06HOMTu9eLVo0zyCT7yv,2024-06-20 14:30:57,90.00,0.00,cny,true,94.80,0.00,hkd,,,4.09,,,Paid,Payment complete.,0.00,,cus_QKQs9LPTbgAMsk,,514643369@qq.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,57,Blender Studio CN,30,,M1
+,2024-06-20 11:29:22,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,57,Blender Studio CN,30,,M1
+,2024-06-20 11:29:16,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,57,Blender Studio CN,30,,M1
+py_3PTdEKHOMTu9eLVo1PYgcoyf,2024-06-20 05:10:29,90.00,0.00,cny,true,94.82,0.00,hkd,,,4.09,,,Paid,Payment complete.,0.00,,cus_QKHpmBsfrELoog,,1797355510@qq.com,,po_1RgT5fHOMTu9eLVo4t8i1MKO,54,Blender Studio CN,30,,M1
+,2024-06-14 06:20:58,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,7,Blender Studio CN,90,,M3
+,2024-06-14 06:20:49,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,7,Blender Studio CN,365,,Y1
+,2024-06-14 06:20:44,540.00,,cny,,,,,,,,,,canceled,,,,,,,,,7,Blender Studio CN,180,,M6
+,2024-06-14 06:20:39,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,7,Blender Studio CN,90,,M3
+,2024-06-14 06:20:31,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,7,Blender Studio CN,30,,M1
+,2024-06-14 03:38:06,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2024-06-10 23:20:45,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,52,30
+,2024-06-06 08:02:09,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,365
+,2024-06-06 08:02:05,540.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,180
+,2024-06-06 08:02:00,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2024-06-03 11:32:27,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,40,365
+,2024-05-30 12:34:41,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,45,30
+py_3PLgMOHOMTu9eLVo11RS7G0r,2024-05-29 06:52:45,90.00,0.00,cny,true,95.06,0.00,hkd,,,4.09,,,Paid,Payment complete.,0.00,,cus_QC4WKxDBd3piwG,,914386539@qq.com,,po_1PNoXBHOMTu9eLVoyldBCXaW,,,,44,30
+,2024-05-23 06:22:56,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,40,30
+,2024-05-23 06:21:31,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,40,30
+,2024-05-03 07:17:24,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,30,30
+,2024-05-03 07:17:06,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,30,30
+,2024-05-03 07:16:12,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,30,90
+,2024-05-03 07:16:04,540.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,30,180
+,2024-05-03 07:15:51,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,30,365
+,2024-04-16 08:06:44,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,20,30
+,2024-04-09 04:31:54,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,30,30
+,2024-04-09 04:31:27,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,30,30
+,2024-04-08 04:37:55,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2024-03-20 04:48:26,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2024-02-28 04:06:27,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2024-02-28 04:01:17,270.00,,cny,,,,,,,,,,canceled,,,,cus_PdwDrrMw1jB3er,,test@alipay.com,,,,,,7,90
+,2024-02-28 04:00:28,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2024-02-16 09:01:36,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,365
+,2024-02-16 09:00:25,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+py_3OZTttHOMTu9eLVo1XlXKYPh,2024-01-17 09:55:07,540.00,0.00,cny,true,540.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_POGTvXgF2gHxT4,,test@alipay.com,,,,,,7,180
+,2024-01-17 06:57:59,1000.00,,cny,,,,,,,,,,canceled,,,,cus_POFZXzkhVQI6Tt,,test@alipay.com,,,,,,7,365
+,2024-01-17 06:56:40,540.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,180
+,2024-01-17 06:53:19,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2023-12-11 09:01:16,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,30
+,2023-12-11 09:01:08,1000.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,365
+,2023-12-11 09:01:01,540.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,180
+,2023-12-11 09:00:51,270.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2023-12-11 08:35:52,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,180
+,2023-12-11 08:35:46,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2023-12-11 08:32:01,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2023-12-11 08:30:22,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,180
+,2023-12-11 08:30:15,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2023-12-11 08:30:09,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,30
+,2023-12-11 08:06:17,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,365
+,2023-12-11 08:06:09,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,180
+,2023-12-11 08:06:01,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,90
+,2023-12-11 08:05:23,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,30
+,2023-12-05 04:01:24,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,20,30
+,2023-10-27 08:35:28,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,365
+,2023-10-27 06:58:57,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,30
+,2023-10-26 20:54:53,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,1,30
+,2023-10-25 09:32:00,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-10-25 09:23:16,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-10-25 09:22:52,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-10-25 09:21:49,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-10-24 09:36:47,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,12,30
+,2023-10-13 04:04:10,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-10-13 04:01:30,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-10-11 04:56:06,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,365
+,2023-10-11 04:55:58,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,180
+,2023-10-11 04:55:53,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,90
+,2023-10-11 04:55:45,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-10-10 04:07:36,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,365
+,2023-09-28 02:34:01,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,8,30
+,2023-09-05 02:26:56,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,1,30
+,2023-09-05 02:22:14,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,1,30
+,2023-09-05 02:19:26,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,1,365
+ch_3NXiSYHOMTu9eLVo0ANton7l,2023-07-25 10:27:34,4.00,0.00,cny,true,4.26,0.00,hkd,,,2.49,,KRYSTAL.INSTITUTE,Paid,Payment complete.,0.00,pm_1NXiSnHOMTu9eLVozFPJAWKx,cus_OKNDSyfOxRScnW,,tim.tan@cgge.media,,po_1PNoXBHOMTu9eLVoyldBCXaW,,,,10,180
+,2023-07-25 09:50:11,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,365
+,2023-07-25 09:02:33,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-25 07:54:47,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+ch_3NXfuyHOMTu9eLVo1VV8nx8P,2023-07-25 07:44:43,4.00,4.00,cny,true,4.26,4.26,hkd,,,2.49,2023-07-25 07:46:33,KRYSTAL.INSTITUTE,Refunded,Payment complete.,0.00,pm_1NXfvBHOMTu9eLVoGNeOFqex,cus_OKKamJ8gaIQK3m,,tim.tan@cgge.media,,po_1PNoXBHOMTu9eLVoyldBCXaW,,,,10,180
+,2023-07-25 07:44:27,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,10,365
+,2023-07-25 07:43:26,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,10,180
+,2023-07-25 07:42:29,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-25 07:29:51,90.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-25 06:51:26,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,10,30
+,2023-07-25 04:23:40,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,1,30
+,2023-07-25 03:08:47,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,5,30
+,2023-07-25 02:50:41,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,1,30
+,2023-07-25 02:48:35,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,1,30
+,2023-07-25 02:40:00,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,1,30
+,2023-07-24 16:08:56,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,7,30
+ch_3NXL41HOMTu9eLVo0cHhToFr,2023-07-24 09:28:36,4.00,4.00,cny,true,4.26,4.26,hkd,,,2.49,2023-07-24 09:41:53,KRYSTAL.INSTITUTE,Refunded,Payment complete.,0.00,pm_1NXL4AHOMTu9eLVodlmfidef,cus_OJz2u3UZ6yFDao,,tim.tan@cgge.media,,po_1PNoXBHOMTu9eLVoyldBCXaW,,,,10,365
+,2023-07-24 09:28:19,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,10,30
+ch_3NXIHyHOMTu9eLVo0VT5c2i0,2023-07-24 06:30:52,4.00,4.00,cny,true,4.26,4.26,hkd,,,2.49,2023-07-24 06:35:07,KRYSTAL.INSTITUTE,Refunded,Payment complete.,0.00,pm_1NXIIAHOMTu9eLVoePXpoVMQ,cus_OJwAlKEGrKaw00,,tim.tan@cgge.media,,po_1PNoXBHOMTu9eLVoyldBCXaW,,,,7,30
+,2023-07-24 04:13:20,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-24 04:03:19,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-24 04:02:06,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-24 03:54:12,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-24 03:45:23,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-24 03:28:35,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-24 03:20:48,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-24 03:20:06,4.00,,cny,,,,,,,,,,canceled,,,,cus_OJt6nKiY9M261t,,test@alipay.com,,,,,,6,30
+,2023-07-24 02:21:56,4.00,,cny,,,,,,,,,,canceled,,,,cus_OJsGUNxCIlbmb4,,test@alipay.com,,,,,,6,30
+,2023-07-21 10:00:03,4.00,,cny,,,,,,,,,,canceled,,,,cus_OIrscsXUdL3jE0,,test@alipay.com,,,,,,6,30
+,2023-07-21 09:55:01,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-21 09:53:07,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-21 09:52:26,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-21 08:38:49,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,90
+,2023-07-21 08:31:02,4.00,,cny,,,,,,,,,,canceled,,,,cus_OIqREX2EamaaP2,,test@alipay.com,,,,,,6,30
+py_3NVUx6HOMTu9eLVo1hgWxou3,2023-07-19 09:45:45,4.00,0.00,cny,true,4.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_OI5C2wnSEcGp8l,,test@wechat.com,,,,,,6,30
+,2023-07-19 09:41:17,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-19 07:44:49,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,90
+,2023-07-19 07:22:11,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-19 06:32:03,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-19 06:18:02,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-19 06:17:28,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-19 06:11:52,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-19 06:09:30,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,6,30
+,2023-07-19 05:18:04,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,1,90
+,2023-07-19 05:17:55,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,1,30
+,2023-07-19 02:31:08,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-19 02:30:40,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-19 02:30:14,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-19 02:22:10,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,1,30
+py_3NV7XBHOMTu9eLVo189Yi2cY,2023-07-18 08:40:18,4.00,0.00,cny,true,4.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_OHgv1u4d4YGqxr,,test@visa.com,,,,,,,
+,2023-07-18 06:52:55,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-18 06:52:35,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-18 06:50:20,4.00,,cny,,,,,,,,,,canceled,,,,cus_OHh8geyIKGrFJc,,test@alipay.com,,,,,,,
+,2023-07-18 06:37:58,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-18 06:35:04,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+py_3NSDJSHOMTu9eLVo0IPPjIET,2023-07-10 08:16:01,4.00,0.00,cny,true,4.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_OEgha6fkQEpRAE,,test@wechat.com,,,,,,,
+,2023-07-10 06:21:13,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-10 06:20:18,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-10 06:13:29,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-10 06:12:57,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+py_3NSArOHOMTu9eLVo1biJVrjN,2023-07-10 05:35:55,4.00,0.00,cny,true,4.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_OEe98RUqnFTvid,,test@wechat.com,,,,,,,
+py_3NSAh3HOMTu9eLVo0ZTZpaxa,2023-07-10 05:25:56,4.00,0.00,cny,true,4.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_OEdzLI53eGjcbr,,test@wechat.com,,,,,,,
+py_3NSAb7HOMTu9eLVo15D1Gb1p,2023-07-10 05:20:58,4.00,0.00,cny,true,4.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_OEdt7nHxnqC1gq,,test@alipay.com,,,,,,,
+,2023-07-10 04:43:00,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-10 04:40:35,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-10 04:40:18,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-10 03:52:46,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-10 03:43:41,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-10 03:33:45,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-10 03:21:53,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-10 03:16:26,4.00,,cny,,,,,,,,,,canceled,,,,cus_OEdsLsrORNpbgV,,test@alipay.com,,,,,,,
+ch_3NRBfdHOMTu9eLVo1aSkHSvB,2023-07-07 10:14:08,4.00,4.00,cny,true,4.23,4.23,hkd,,,2.49,2023-07-07 10:15:20,KRYSTAL.INSTITUTE,Refunded,Payment complete.,0.00,pm_1NRBfvHOMTu9eLVoEzFzMR1f,cus_ODcvhRrJrN7hrE,,tim.tan@cgge.media,,po_1PNoXBHOMTu9eLVoyldBCXaW,,,,,
+ch_3NRBVDHOMTu9eLVo107esweQ,2023-07-07 10:03:18,4.00,4.00,cny,true,4.23,4.23,hkd,,,2.49,2023-07-07 10:06:19,KRYSTAL.INSTITUTE,Refunded,Payment complete.,0.00,pm_1NRBVRHOMTu9eLVobUSzVZy2,cus_ODckbwzw49Dw7S,,tim.tan@cgge.media,,po_1PNoXBHOMTu9eLVoyldBCXaW,,,,,
+,2023-07-07 09:53:37,4.00,,cny,,,,,,,,,,canceled,,,,cus_ODcbgWIEF4WUHY,,test@visa.com,,,,,,,
+,2023-07-07 09:53:17,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-07 09:33:15,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+ch_3NRAbzHOMTu9eLVo0LjT6mwt,2023-07-07 09:06:16,4.00,4.00,cny,true,4.23,4.23,hkd,,,2.49,2023-07-07 09:12:28,KRYSTAL.INSTITUTE,Refunded,Payment complete.,0.00,pm_1NRAcEHOMTu9eLVoQmK5fzUt,cus_ODbpgIiAlBupU0,,tim.tan@cgge.media,,po_1PNoXBHOMTu9eLVoyldBCXaW,,,,,
+,2023-07-07 09:01:40,4.00,,cny,,,,,,,,,,canceled,,,,cus_ODblb0AZw0mfDs,,test@visa.com,,,,,,,
+,2023-07-07 09:00:48,4.00,,cny,,,,,,,,,,canceled,,,,cus_ODbkM60ooZlOkG,,test@visa.com,,,,,,,
+,2023-07-07 08:18:37,4.00,,cny,,,,,,,,,,canceled,,,,cus_ODb4FeWLBnVUhg,,test@visa.com,,,,,,,
+,2023-07-07 06:09:03,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-07 04:45:07,4.00,,cny,,,,,,,,,,canceled,,,,cus_ODXcpqpurKtbue,,test@visa.com,,,,,,,
+,2023-07-07 03:58:40,4.00,,cny,,,,,,,,,,canceled,,,,cus_ODWsBYEkV6Wdge,,test@visa.com,,,,,,,
+,2023-07-07 03:04:49,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-07 00:41:09,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+py_3NQoc6HOMTu9eLVo0gR99zXX,2023-07-06 11:40:42,4.00,0.00,cny,true,4.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_ODF6g1eCXddqiO,,test@alipay.com,,,,,,,
+py_3NQnYoHOMTu9eLVo1FBhVFpI,2023-07-06 10:30:39,4.00,0.00,cny,true,4.00,0.00,cny,generic_decline,,0.00,,,Failed,The bank did not return any further details with this decline.,0.00,,cus_ODE1Xc0epi1psu,,test@wechat.com,,,,,,,
+ch_3NQoyoHOMTu9eLVo1MVSVDOd,2023-07-06 10:00:19,4.00,4.00,cny,true,4.23,4.23,hkd,,,2.49,2023-07-06 10:01:00,KRYSTAL.INSTITUTE,Refunded,Payment complete.,0.00,pm_1NQoyzHOMTu9eLVoGDf5JTTr,cus_ODFT9sr5qKR0S3,,tim.tan@cgge.media,,po_1PNoXBHOMTu9eLVoyldBCXaW,,,,,
+,2023-07-06 09:46:23,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+ch_3NQojAHOMTu9eLVo0OpOCftZ,2023-07-06 09:44:15,4.00,4.00,cny,true,4.23,4.23,hkd,,,2.49,2023-07-06 09:45:08,KRYSTAL.INSTITUTE,Refunded,Payment complete.,0.00,pm_1NQojRHOMTu9eLVoHhrYoEs5,cus_ODFDaxztnHUm4a,,spencer.timothy@gmail.com,,po_1PNoXBHOMTu9eLVoyldBCXaW,,,,,
+,2023-07-06 09:43:29,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-06 09:42:12,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-06 09:05:09,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-06 08:34:06,4.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-06 08:25:12,4.00,,cny,,,,,,,,,,canceled,,,,cus_ODDzHs5TYTTxVL,,test@visa.com,,,,,,,
+,2023-07-05 03:40:26,10.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-04 06:44:17,10.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-04 06:28:00,10.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-04 06:27:11,10.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-04 06:15:29,10.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-04 06:14:43,10.00,,cny,,,,,,,,,,canceled,,,,,,,,,,,,,
+,2023-07-04 03:01:45,10.00,,cny,,,,,,,,,,canceled,,,,cus_OCOHbgGyhLGKAH,,test@alipay.com,,,,,,,
