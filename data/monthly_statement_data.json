@@ -1,0 +1,227 @@
+{
+  "cgge_2025-08": {
+    "company": "cgge",
+    "period": "2025-08",
+    "created_at": "2025-09-04T11:10:58.969829",
+    "updated_at": "2025-09-04T11:34:51.565723",
+    "opening_balance": 554.77,
+    "closing_balance": -0.0,
+    "total_transactions": 19,
+    "total_debit": 480.99,
+    "total_credit": 1035.76,
+    "transactions": [
+      {
+        "date": "2025-08-01",
+        "nature": "Payout",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 92.52,
+        "description": "BOC(HK)",
+        "acknowledged": "No",
+        "balance": 462.25
+      },
+      {
+        "date": "2025-08-01",
+        "nature": "Gross Payment",
+        "party": "\u9648\u70ab\u5b87",
+        "debit": 96.2,
+        "credit": 0,
+        "description": "isbn97871154@163.com",
+        "acknowledged": "No",
+        "balance": 558.45
+      },
+      {
+        "date": "2025-08-01",
+        "nature": "Processing Fee",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 4.12,
+        "description": "Stripe processing fee",
+        "acknowledged": "No",
+        "balance": 554.33
+      },
+      {
+        "date": "2025-08-04",
+        "nature": "Payout",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 92.46,
+        "description": "BOC(HK)",
+        "acknowledged": "No",
+        "balance": 461.87000000000006
+      },
+      {
+        "date": "2025-08-04",
+        "nature": "Payout",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 277.38,
+        "description": "BOC(HK)",
+        "acknowledged": "No",
+        "balance": 184.49000000000007
+      },
+      {
+        "date": "2025-08-04",
+        "nature": "Payout",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 92.41,
+        "description": "BOC(HK)",
+        "acknowledged": "No",
+        "balance": 92.08000000000007
+      },
+      {
+        "date": "2025-08-04",
+        "nature": "Processing Fee",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 4.12,
+        "description": "Stripe processing fee",
+        "acknowledged": "No",
+        "balance": 87.96000000000006
+      },
+      {
+        "date": "2025-08-04",
+        "nature": "Gross Payment",
+        "party": "\u674e\u707f\u660e",
+        "debit": 96.5,
+        "credit": 0,
+        "description": "19859500006@139.com",
+        "acknowledged": "No",
+        "balance": 184.46000000000006
+      },
+      {
+        "date": "2025-08-07",
+        "nature": "Payout",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 92.08,
+        "description": "BOC(HK)",
+        "acknowledged": "No",
+        "balance": 92.38000000000007
+      },
+      {
+        "date": "2025-08-11",
+        "nature": "Payout",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 92.38,
+        "description": "BOC(HK)",
+        "acknowledged": "No",
+        "balance": 7.105427357601002e-14
+      },
+      {
+        "date": "2025-08-15",
+        "nature": "Gross Payment",
+        "party": "unknown name",
+        "debit": 96.33,
+        "credit": 0,
+        "description": "kiroslee@sina.com",
+        "acknowledged": "No",
+        "balance": 96.33000000000007
+      },
+      {
+        "date": "2025-08-15",
+        "nature": "Processing Fee",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 4.12,
+        "description": "Stripe Processing fee",
+        "acknowledged": "No",
+        "balance": 92.21000000000006
+      },
+      {
+        "date": "2025-08-17",
+        "nature": "Gross Payment",
+        "party": "unknown name",
+        "debit": 96.12,
+        "credit": 0,
+        "description": "84830955@qq.com",
+        "acknowledged": "No",
+        "balance": 188.33000000000007
+      },
+      {
+        "date": "2025-08-17",
+        "nature": "Processing Fee",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 4.11,
+        "description": "Stripe Processing Fee",
+        "acknowledged": "No",
+        "balance": 184.22000000000006
+      },
+      {
+        "date": "2025-08-19",
+        "nature": "Gross Payment",
+        "party": "SHENGYU ZHOU",
+        "debit": 95.84,
+        "credit": 0,
+        "description": "283273731@qq.com",
+        "acknowledged": "No",
+        "balance": 280.06000000000006
+      },
+      {
+        "date": "2025-08-19",
+        "nature": "Processing Fee",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 4.11,
+        "description": "Stripe processing fee",
+        "acknowledged": "No",
+        "balance": 275.95000000000005
+      },
+      {
+        "date": "2025-08-22",
+        "nature": "Payout",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 92.21,
+        "description": "BOC(HK)",
+        "acknowledged": "No",
+        "balance": 183.74000000000007
+      },
+      {
+        "date": "2025-08-25",
+        "nature": "Payout",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 92.01,
+        "description": "BOC(HK)",
+        "acknowledged": "No",
+        "balance": 91.73000000000006
+      },
+      {
+        "date": "2025-08-26",
+        "nature": "Payout",
+        "party": "Stripe",
+        "debit": 0,
+        "credit": 91.73,
+        "description": "BOC(HK)",
+        "acknowledged": "No",
+        "balance": 5.684341886080802e-14
+      }
+    ]
+  },
+  "ki_2025-08": {
+    "company": "ki",
+    "period": "2025-08",
+    "created_at": "2025-09-04T11:46:19.818417",
+    "opening_balance": 1427.61,
+    "closing_balance": 1427.61,
+    "total_transactions": 0,
+    "total_debit": 0,
+    "total_credit": 0,
+    "transactions": []
+  },
+  "kt_2025-08": {
+    "company": "kt",
+    "period": "2025-08",
+    "created_at": "2025-09-04T11:44:39.481090",
+    "opening_balance": 0.0,
+    "closing_balance": 0.0,
+    "total_transactions": 0,
+    "total_debit": 0,
+    "total_credit": 0,
+    "transactions": []
+  }
+}

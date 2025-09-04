@@ -144,8 +144,9 @@ class CompleteCsvService:
     def _parse_csv_row(self, row, company_code):
         """Parse a CSV row into standardized transaction format"""
         try:
-            # Parse created date
-            created_str = row.get('Created (UTC)', '').strip()
+            # Parse created date - handle both column name variations
+            created_str = row.get('Created date (UTC)', '') or row.get('Created (UTC)', '')
+            created_str = created_str.strip()
             created = None
             if created_str:
                 try:
@@ -169,6 +170,7 @@ class CompleteCsvService:
                         pass
             
             # Parse transfer date (for payout reconciliation)
+            # First try explicit Transfer Date column
             transfer_str = row.get('Transfer Date (UTC)', '').strip()
             transfer_date = None
             if transfer_str:
@@ -180,20 +182,38 @@ class CompleteCsvService:
                     except ValueError:
                         pass
             
-            # Determine transaction type first
+            # If no transfer date but we have a created date, use created + 2 days as estimated transfer
+            # (Stripe typically transfers funds 2 days after transaction)
+            if not transfer_date and created:
+                transfer_date = (created + timedelta(days=2)).date()
+            
+            # Determine transaction type from ID or Type column
             transaction_type = row.get('Type', '').lower()
+            
+            # If no Type column, infer from ID prefix
+            if not transaction_type:
+                tx_id = row.get('id', '').strip()
+                if tx_id.startswith('py_') or tx_id.startswith('pi_'):
+                    transaction_type = 'payment'
+                elif tx_id.startswith('ch_'):
+                    transaction_type = 'charge'
+                elif tx_id.startswith('re_'):
+                    transaction_type = 'refund'
+                elif tx_id.startswith('po_'):
+                    transaction_type = 'payout'
+                else:
+                    # Default to payment if we have an amount
+                    amount_str = row.get('Amount', '0')
+                    if amount_str and amount_str != '0':
+                        transaction_type = 'payment'
             
             # Parse amounts with enhanced fee handling
             amount = self._parse_decimal(row.get('Amount', '0'))
             fee = self._parse_decimal(row.get('Fee', '0'))
             net = self._parse_decimal(row.get('Net', '0'))
             
-            # Enhanced fee estimation for missing fee data
-            if fee == 0 and transaction_type in ['charge', 'payment'] and amount > 0:
-                # Estimate fee based on typical Stripe rates if not provided
-                estimated_fee = amount * Decimal('0.042')  # ~4.2% typical rate
-                self.logger.debug(f"Estimating fee for transaction {row.get('id', '')}: {estimated_fee}")
-                fee = estimated_fee.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            # Don't estimate fees - use actual fee data from CSV
+            # The Fee column should have the actual fees charged
             
             # Get description
             description = row.get('Description', '').strip()
@@ -392,28 +412,34 @@ class CompleteCsvService:
     
     def _extract_party_from_metadata(self, row):
         """Extract customer reference from metadata fields, prioritizing email addresses"""
-        # First, check for email fields in the CSV
+        # First, check for email fields in the CSV - expanded list
         email_fields = [
             'Customer Email',
             'customer_email', 
             'email',
             'Email',
             'customer_email (metadata)',
-            'email (metadata)'
+            'email (metadata)',
+            '2. User email (metadata)',  # From CGGE CSV format
+            'Customer Description'  # Sometimes contains email
         ]
         
         for field in email_fields:
-            email = row.get(field, '').strip()
-            if email and '@' in email:
-                return email
+            value = row.get(field, '').strip()
+            if value and '@' in value:
+                return value
         
-        # Check for userID in metadata
+        # Check for userID in metadata if no email found
         user_id = row.get('userID (metadata)', '').strip()
         if user_id:
+            # Try to find corresponding email in other fields first
+            user_email = row.get('2. User email (metadata)', '').strip()
+            if user_email and '@' in user_email:
+                return user_email
             return f"User {user_id}"
         
         # Check for other customer identifiers
-        site = row.get('site (metadata)', '').strip()
+        site = row.get('site (metadata)', '').strip() or row.get('1. Site (metadata)', '').strip()
         stripe_plan = row.get('stripe_plan (metadata)', '').strip()
         
         if site and stripe_plan:
