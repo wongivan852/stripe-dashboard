@@ -78,13 +78,14 @@ def create_app():
         </head>
         <body>
             <h1>🏦 Stripe Balance Reconciliation Dashboard</h1>
-            <p><strong>Status:</strong> Balance carry-forward FIXED | July 2025: HK$554.77 ✅</p>
+            <p><strong>Status:</strong> Balance carry-forward FIXED | Latest: August 2025 ✅</p>
             
             <div class="test-section">
                 <h2>📅 Monthly Statement Testing</h2>
                 <button onclick="testNovember()">November 2021</button>
                 <button onclick="testDecember()">December 2021</button>
                 <button onclick="testJuly()">July 2025</button>
+                <button onclick="testAugust()">August 2025</button>
                 <button onclick="testContinuity()">Test Continuity</button>
                 <div id="statement-results"></div>
             </div>
@@ -97,7 +98,14 @@ def create_app():
             </div>
             
             <div class="test-section">
-                <h2>🔗 Quick Links</h2>
+                <h2>� CSV Data Input Interface</h2>
+                <button onclick="window.open('/csv-input', '_blank')">Open CSV Input UI</button>
+                <button onclick="testCSVAPI()" class="api-button">Test CSV API</button>
+                <div id="csv-results"></div>
+            </div>
+            
+            <div class="test-section">
+                <h2>�🔗 Quick Links</h2>
                 <button onclick="window.open('/analytics/simple', '_blank')">Simple Analytics</button>
                 <button onclick="window.open('/analytics/monthly-statement', '_blank')">Monthly Generator</button>
                 <button onclick="window.open('/analytics/payout-reconciliation', '_blank')">Payout Reconciliation</button>
@@ -153,6 +161,27 @@ def create_app():
                             html += '<p><strong>Closing Balance:</strong> HK$' + julyStatement.closing_balance.toFixed(2);
                             html += (julyStatement.closing_balance.toFixed(2) === '554.77') ? ' <span class="pass">[CORRECT]</span>' : ' <span class="fail">[INCORRECT - Should be 554.77]</span>';
                             html += '</p><p><strong>Transactions:</strong> ' + julyStatement.transactions.length + '</p>';
+                            
+                            document.getElementById('statement-results').innerHTML = html;
+                        } else {
+                            document.getElementById('statement-results').innerHTML = '<div class="fail">Error: ' + data.error + '</div>';
+                        }
+                    } catch (error) {
+                        document.getElementById('statement-results').innerHTML = '<div class="fail">Error: ' + error.message + '</div>';
+                    }
+                }
+                
+                async function testAugust() {
+                    try {
+                        const response = await fetch('/analytics/api/monthly-statement?company=cgge&year=2025&month=8');
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            let html = '<h3>August 2025 - CGGE</h3>';
+                            html += '<p><strong>Opening Balance:</strong> HK$' + data.statement.opening_balance.toFixed(2) + '</p>';
+                            html += '<p><strong>Closing Balance:</strong> HK$' + data.statement.closing_balance.toFixed(2) + '</p>';
+                            html += '<p><strong>Transactions:</strong> ' + data.statement.transactions.length + '</p>';
+                            html += '<p class="pass">✅ August 2025 data loaded successfully!</p>';
                             
                             document.getElementById('statement-results').innerHTML = html;
                         } else {
@@ -240,11 +269,65 @@ def create_app():
                 function openPayoutInterface() {
                     window.open('/analytics/payout-reconciliation', '_blank');
                 }
+                
+                async function testCSVAPI() {
+                    try {
+                        // Test sample CSV data for August 2025 CGGE
+                        const sampleCSV = `id,Created date (UTC),Amount,Fee,Status,Customer Email
+test1,2025-08-01 10:00:00,127.30,4.80,succeeded,student1@cgge.edu
+test2,2025-08-04 14:30:00,135.50,5.10,succeeded,student2@cgge.edu
+test3,2025-08-15 09:15:00,142.80,5.38,succeeded,student3@cgge.edu
+test4,2025-08-17 16:45:00,118.90,4.49,succeeded,student4@cgge.edu
+test5,2025-08-19 11:20:00,156.20,5.89,succeeded,student5@cgge.edu`;
+                        
+                        const response = await fetch('/csv-input/api/process', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                csv_data: sampleCSV,
+                                company: 'cgge',
+                                year: 2025,
+                                month: 8,
+                                opening_balance: 0.0,
+                                allowed_dates: '1,4,15,17,19'
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            let html = '<h3>CSV API Test Results - August 2025 CGGE</h3>';
+                            html += '<p><strong>Processing Status:</strong> <span class="pass">SUCCESS</span></p>';
+                            html += '<p><strong>Transactions Processed:</strong> ' + data.summary.total_transactions + '</p>';
+                            html += '<p><strong>Opening Balance:</strong> HK$' + data.summary.opening_balance.toFixed(2) + '</p>';
+                            html += '<p><strong>Closing Balance:</strong> HK$' + data.summary.closing_balance.toFixed(2) + '</p>';
+                            html += '<p><strong>Total Amount:</strong> HK$' + data.summary.total_amount.toFixed(2) + '</p>';
+                            html += '<p><strong>Total Fees:</strong> HK$' + data.summary.total_fees.toFixed(2) + '</p>';
+                            html += '<p><strong>Net Income:</strong> HK$' + data.summary.total_net.toFixed(2) + '</p>';
+                            
+                            document.getElementById('csv-results').innerHTML = html;
+                        } else {
+                            document.getElementById('csv-results').innerHTML = '<div class="fail">Error: ' + data.error + '</div>';
+                        }
+                    } catch (error) {
+                        document.getElementById('csv-results').innerHTML = '<div class="fail">Error: ' + error.message + '</div>';
+                    }
+                }
             </script>
         </body>
         </html>
         '''
     
+    # Register CSV input API blueprint
+    try:
+        from csv_input_api import csv_input_bp
+        app.register_blueprint(csv_input_bp)
+        print("✅ CSV Input API blueprint registered successfully")
+    except ImportError as e:
+        print(f"❌ CSV Input API blueprint import failed: {e}")
+        
     # Register analytics blueprint if it exists
     try:
         from app.routes.analytics import analytics_bp

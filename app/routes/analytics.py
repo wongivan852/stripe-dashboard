@@ -4009,6 +4009,45 @@ def payout_reconciliation_api():
             'error': str(e),
             'timestamp': datetime.now().isoformat()
         }), 500
+
+@analytics_bp.route('/api/stripe-consistent-statement')
+def stripe_consistent_statement_api():
+    """Generate monthly statement that matches Stripe's official report format"""
+    try:
+        from app.services.complete_csv_service import CompleteCsvService
+        
+        company = request.args.get('company')
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)
+        
+        if not all([company, year, month]):
+            return jsonify({
+                'success': False,
+                'error': 'Missing required parameters: company, year, month'
+            }), 400
+        
+        logger.info(f"Generating Stripe-consistent statement for {company} {year}-{month:02d}")
+        
+        service = CompleteCsvService()
+        statement = service.generate_stripe_consistent_statement(year, month, company)
+        
+        return jsonify({
+            'success': True,
+            'statement': statement,
+            'debug_info': {
+                'calculation_method': 'stripe_payout_based',
+                'total_transactions': len(statement['transactions'])
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating Stripe-consistent statement: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 # Web Interface Routes for Monthly Statement and Payout Reconciliation
 
 @analytics_bp.route('/monthly-statement')
@@ -4257,33 +4296,12 @@ def monthly_statement_interface():
                 
                 let html = `
                     <div class="statement-header">
-                        <h1>📄 Monthly Statement Generator</h1>
-                        <p>Generate consolidated monthly statements with running balance</p>
-                    </div>
-                    
-                    <div class="statement-summary">
-                        <h3>Statement Summary for ${monthNames[statement.month]} ${statement.year}</h3>
-                        <div class="summary-grid">
-                            <div class="summary-item">
-                                <span><strong>Company:</strong></span>
-                                <span>${companyName}</span>
-                            </div>
-                            <div class="summary-item">
-                                <span><strong>Opening Balance:</strong></span>
-                                <span>HK$${statement.opening_balance.toFixed(2)}</span>
-                            </div>
-                            <div class="summary-item">
-                                <span><strong>Closing Balance:</strong></span>
-                                <span>HK$${statement.closing_balance.toFixed(2)}</span>
-                            </div>
-                            <div class="summary-item">
-                                <span><strong>Total Transactions:</strong></span>
-                                <span>${statement.transactions.length}</span>
-                            </div>
-                        </div>
+                        <h1>📄 Monthly Statement - ${monthNames[statement.month]} ${statement.year}</h1>
+                        <p>Company: ${companyName}</p>
                     </div>
                     
                     <div class="statement-content">
+                        <h3>Transaction Details</h3>
                         <table class="statement-table">
                             <thead>
                                 <tr>
@@ -4351,6 +4369,36 @@ def monthly_statement_interface():
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <div class="statement-summary">
+                        <h3>Statement Summary</h3>
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <span><strong>Opening Balance:</strong></span>
+                                <span>HK$${statement.opening_balance.toFixed(2)}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span><strong>Closing Balance:</strong></span>
+                                <span>HK$${statement.closing_balance.toFixed(2)}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span><strong>Total Debits:</strong></span>
+                                <span>HK$${statement.total_debit.toFixed(2)}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span><strong>Total Credits:</strong></span>
+                                <span>HK$${statement.total_credit.toFixed(2)}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span><strong>Net Movement:</strong></span>
+                                <span>HK$${(statement.total_debit - statement.total_credit).toFixed(2)}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span><strong>Total Transactions:</strong></span>
+                                <span>${statement.transactions.length}</span>
+                            </div>
+                        </div>
                     </div>
                 `;
                 

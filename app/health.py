@@ -44,9 +44,11 @@ def health_check():
     # 2. Database Health
     try:
         from app import db
+        from sqlalchemy import text
         
-        # Test database connection
-        result = db.engine.execute('SELECT 1').fetchone()
+        # Test database connection using modern SQLAlchemy syntax
+        with db.engine.connect() as connection:
+            result = connection.execute(text('SELECT 1')).fetchone()
         
         # Get database file info if SQLite
         db_url = current_app.config.get('SQLALCHEMY_DATABASE_URI', '')
@@ -202,18 +204,20 @@ def database_health_check():
     """
     try:
         from app import db
+        from sqlalchemy import text
         
-        # Test basic connection
-        result = db.engine.execute('SELECT 1').fetchone()
+        # Test basic connection using modern SQLAlchemy syntax
+        with db.engine.connect() as connection:
+            result = connection.execute(text('SELECT 1')).fetchone()
         
-        # Try to get table count if possible
-        try:
-            tables_result = db.engine.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
-            table_count = len(tables_result)
-        except:
-            table_count = 'unknown'
+            # Try to get table count if possible
+            try:
+                tables_result = connection.execute(
+                    text("SELECT name FROM sqlite_master WHERE type='table'")
+                ).fetchall()
+                table_count = len(tables_result)
+            except:
+                table_count = 'unknown'
         
         return jsonify({
             'status': 'healthy',

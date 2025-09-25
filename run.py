@@ -84,12 +84,18 @@ def main():
         # Open http://localhost:8081 for setup instructions
         
         app = create_minimal_app()
-        port = int(os.getenv('APP_PORT', 8082))
+        port = int(os.getenv('APP_PORT', 8084))
         app.run(debug=True, host='0.0.0.0', port=port)
         return
     
     # Try to import the full app
     try:
+        # Force clear all app modules from memory  
+        import importlib
+        modules_to_clear = [key for key in list(sys.modules.keys()) if key.startswith('app')]
+        for module_name in modules_to_clear:
+            sys.modules.pop(module_name, None)
+        
         from app import create_app, db
         from app.models import StripeAccount, Transaction
         
@@ -107,14 +113,14 @@ def main():
                 # Database warning suppressed for production
                 pass
         
-        port = int(os.getenv('APP_PORT', 8082))
+        port = int(os.getenv('APP_PORT', 8084))
         app.run(debug=True, host='0.0.0.0', port=port)
         
     except ImportError as e:
         # Import error - starting setup mode
         
         app = create_minimal_app()
-        port = int(os.getenv('APP_PORT', 8082))
+        port = int(os.getenv('APP_PORT', 8084))
         app.run(debug=True, host='0.0.0.0', port=port)
     
     except Exception as e:

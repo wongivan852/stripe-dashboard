@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe CSV Data Input Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        
+        .main-content {
+            padding: 40px;
+        }
+        
+        .section {
+            background: #f8fafc;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-left: 5px solid #10b981;
+        }
+        
+        .section h2 {
+            color: #1e293b;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .form-group label {
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .form-group input, 
+        .form-group select, 
+        .form-group textarea {
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+        
+        .file-upload {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 3px dashed #10b981;
+            border-radius: 15px;
+            padding: 40px 20px;
+            background: #f0fdf4;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload:hover {
+            background: #dcfce7;
+            border-color: #059669;
+        }
+        
+        .file-upload input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        
+        .file-upload-icon {
+            font-size: 3rem;
+            color: #10b981;
+            margin-bottom: 15px;
+        }
+        
+        .file-upload-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #059669;
+            text-align: center;
+        }
+        
+        .file-upload-subtext {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+            transform: translateY(-2px);
+        }
+        
+        .preview-section {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .preview-table th {
+            background: #1e293b;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .preview-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .preview-table tr:hover {
+            background: #f8fafc;
+        }
+        
+        .status-message {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+        
+        .status-success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        
+        .status-error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        
+        .status-warning {
+            background: #fffbeb;
+            color: #d97706;
+            border: 1px solid #fed7aa;
+        }
+        
+        .processing {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #e5e7eb;
+            border-top: 5px solid #10b981;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .info-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .info-box h3 {
+            color: #1e40af;
+            margin-bottom: 10px;
+        }
+        
+        .info-box ul {
+            color: #374151;
+            margin-left: 20px;
+        }
+        
+        .info-box li {
+            margin: 5px 0;
+        }
+        
+        .date-filter {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .date-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e5e7eb;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .date-checkbox:hover {
+            border-color: #10b981;
+        }
+        
+        .date-checkbox input[type="checkbox"] {
+            margin: 0;
+        }
+        
+        .date-checkbox.checked {
+            background: #dcfce7;
+            border-color: #10b981;
+        }
+        
+        .payout-entries {
+            margin-top: 20px;
+        }
+        
+        .payout-entry {
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .payout-entry:hover {
+            background: #f1f5f9;
+        }
+        
+        .payout-info {
+            flex: 1;
+        }
+        
+        .payout-info .payout-date {
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .payout-info .payout-amount {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #059669;
+        }
+        
+        .payout-info .payout-details {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+        
+        .payout-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .payout-actions button {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        
+        .edit-payout {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .delete-payout {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .payout-summary {
+            background: #dcfce7;
+            border: 1px solid #10b981;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .payout-summary h4 {
+            color: #059669;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Stripe CSV Data Input</h1>
+            <p>Upload and process your Stripe transaction data with intelligent filtering and validation</p>
+        </div>
+        
+        <div class="main-content">
+            <!-- File Upload Section -->
+            <div class="section">
+                <h2>📁 Upload CSV File</h2>
+                <div class="file-upload" onclick="document.getElementById('csvFile').click()">
+                    <input type="file" id="csvFile" accept=".csv" onchange="handleFileUpload(this)">
+                    <div class="file-upload-icon">📄</div>
+                    <div class="file-upload-text">Click to upload CSV file</div>
+                    <div class="file-upload-subtext">Supports Stripe CSV exports (.csv files)</div>
+                </div>
+                <div id="fileStatus"></div>
+            </div>
+            
+            <!-- Configuration Section -->
+            <div class="section">
+                <h2>⚙️ Processing Configuration</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Company Code</label>
+                        <select id="companyCode">
+                            <option value="cgge">CGGE</option>
+                            <option value="bcv">BCV</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Target Year</label>
+                        <input type="number" id="targetYear" value="2025" min="2020" max="2030">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Target Month</label>
+                        <select id="targetMonth">
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8" selected>August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Opening Balance (HKD)</label>
+                        <input type="number" id="openingBalance" step="0.01" placeholder="0.00">
+                    </div>
+                </div>
+                
+                <!-- Special Date Filtering for August 2025 -->
+                <div id="dateFilterSection" style="display: none;">
+                    <label style="margin-top: 20px; margin-bottom: 10px; display: block; font-weight: 600;">Allowed Transaction Dates</label>
+                    <div class="date-filter">
+                        <div class="date-checkbox" onclick="toggleDateFilter(1)">
+                            <input type="checkbox" id="date1" checked>
+                            <span>Aug 01</span>
+                        </div>
+                        <div class="date-checkbox checked" onclick="toggleDateFilter(4)">
+                            <input type="checkbox" id="date4" checked>
+                            <span>Aug 04</span>
+                        </div>
+                        <div class="date-checkbox checked" onclick="toggleDateFilter(15)">
+                            <input type="checkbox" id="date15" checked>
+                            <span>Aug 15</span>
+                        </div>
+                        <div class="date-checkbox checked" onclick="toggleDateFilter(17)">
+                            <input type="checkbox" id="date17" checked>
+                            <span>Aug 17</span>
+                        </div>
+                        <div class="date-checkbox checked" onclick="toggleDateFilter(19)">
+                            <input type="checkbox" id="date19" checked>
+                            <span>Aug 19</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stripe Payout Section -->
+            <div class="section" id="payoutSection">
+                <h2>🏦 Stripe Payout Information</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Payout Date</label>
+                        <input type="date" id="payoutDate" placeholder="YYYY-MM-DD">
+                    </div>
+                    <div class="form-group">
+                        <label>Payout Amount (HKD)</label>
+                        <input type="number" id="payoutAmount" step="0.01" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>Payout ID</label>
+                        <input type="text" id="payoutId" placeholder="po_xxxxxxxxx">
+                    </div>
+                    <div class="form-group">
+                        <label>Payout Status</label>
+                        <select id="payoutStatus">
+                            <option value="">Select Status</option>
+                            <option value="paid">Paid</option>
+                            <option value="pending">Pending</option>
+                            <option value="in_transit">In Transit</option>
+                            <option value="canceled">Canceled</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Description/Notes</label>
+                    <textarea id="payoutDescription" rows="2" placeholder="Optional notes about this payout..." style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 8px; font-family: inherit;"></textarea>
+                </div>
+                
+                <div class="button-group" style="margin-top: 15px;">
+                    <button class="btn btn-secondary" onclick="addPayoutEntry()">➕ Add Payout Entry</button>
+                    <button class="btn btn-secondary" onclick="clearPayouts()" style="background: #ef4444;">🗑️ Clear All Payouts</button>
+                </div>
+                
+                <div id="payoutList" class="payout-entries"></div>
+            </div>
+            
+            <!-- Processing Options -->
+            <div class="section">
+                <h2>🔧 Processing Options</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="skipInvalidTransactions" checked> 
+                            Skip Invalid Transactions
+                        </label>
+                        <small style="color: #6b7280;">Automatically skip transactions with empty IDs or zero amounts</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="generateSyntheticTransactions"> 
+                            Generate Synthetic Transactions
+                        </label>
+                        <small style="color: #6b7280;">Add missing transactions for specified dates</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="validateBalances" checked> 
+                            Validate Running Balances
+                        </label>
+                        <small style="color: #6b7280;">Ensure balance calculations are accurate</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Information Box -->
+            <div class="info-box">
+                <h3>ℹ️ Processing Logic</h3>
+                <ul>
+                    <li><strong>Date Parsing:</strong> Uses "Created date (UTC)" column with format YYYY-MM-DD HH:MM:SS</li>
+                    <li><strong>Amount Handling:</strong> Processes "Converted Amount" and "Fee" columns as Decimal for precision</li>
+                    <li><strong>Filtering:</strong> Supports date-specific filtering (e.g., August 2025 CGGE requires specific dates)</li>
+                    <li><strong>Balance Calculation:</strong> Computes running balances with proper opening balance handling</li>
+                    <li><strong>Validation:</strong> Skips invalid entries and provides detailed error reporting</li>
+                </ul>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="processData()">🚀 Process Data</button>
+                <button class="btn btn-secondary" onclick="previewData()">👀 Preview Data</button>
+                <button class="btn btn-secondary" onclick="downloadTemplate()">📥 Download Template</button>
+                <button class="btn btn-secondary" onclick="exportPayoutData()">🏦 Export Payouts</button>
+                <button class="btn btn-secondary" onclick="resetForm()">🔄 Reset Form</button>
+            </div>
+            
+            <!-- Processing Status -->
+            <div class="processing" id="processingStatus">
+                <div class="spinner"></div>
+                <p>Processing your data...</p>
+            </div>
+            
+            <!-- Results Section -->
+            <div class="preview-section" id="resultsSection">
+                <h2>📈 Processing Results</h2>
+                <div id="resultsContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let csvData = null;
+        let processedResults = null;
+
+        // Handle file upload
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            const statusDiv = document.getElementById('fileStatus');
+            
+            if (!file) {
+                statusDiv.innerHTML = '';
+                return;
+            }
+            
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                statusDiv.innerHTML = '<div class="status-message status-error">❌ Please select a CSV file</div>';
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    csvData = parseCSV(text);
+                    statusDiv.innerHTML = `<div class="status-message status-success">✅ File uploaded successfully! Found ${csvData.length} rows</div>`;
+                    updateDateFilterVisibility();
+                } catch (error) {
+                    statusDiv.innerHTML = `<div class="status-message status-error">❌ Error reading file: ${error.message}</div>`;
+                    csvData = null;
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Simple CSV parser
+        function parseCSV(text) {
+            const lines = text.split('\n');
+            if (lines.length < 2) throw new Error('CSV file must have at least a header and one data row');
+            
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+            const rows = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                
+                const values = parseCSVLine(line);
+                if (values.length !== headers.length) continue;
+                
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index];
+                });
+                rows.push(row);
+            }
+            
+            return rows;
+        }
+
+        // Parse a single CSV line handling quotes and commas
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            result.push(current.trim());
+            return result;
+        }
+
+        // Update date filter visibility
+        function updateDateFilterVisibility() {
+            const year = parseInt(document.getElementById('targetYear').value);
+            const month = parseInt(document.getElementById('targetMonth').value);
+            const company = document.getElementById('companyCode').value;
+            
+            const dateFilterSection = document.getElementById('dateFilterSection');
+            if (year === 2025 && month === 8 && company === 'cgge') {
+                dateFilterSection.style.display = 'block';
+            } else {
+                dateFilterSection.style.display = 'none';
+            }
+        }
+
+        // Toggle date filter checkbox
+        function toggleDateFilter(date) {
+            const checkbox = document.getElementById(`date${date}`);
+            const container = checkbox.parentElement;
+            
+            checkbox.checked = !checkbox.checked;
+            if (checkbox.checked) {
+                container.classList.add('checked');
+            } else {
+                container.classList.remove('checked');
+            }
+        }
+
+        // Preview data
+        function previewData() {
+            if (!csvData) {
+                alert('Please upload a CSV file first');
+                return;
+            }
+            
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsContent = document.getElementById('resultsContent');
+            
+            let html = '<h3>📋 CSV Data Preview (First 10 rows)</h3>';
+            html += '<div style="overflow-x: auto; margin: 20px 0;">';
+            html += '<table class="preview-table">';
+            
+            // Headers
+            if (csvData.length > 0) {
+                html += '<tr>';
+                Object.keys(csvData[0]).forEach(header => {
+                    html += `<th>${header}</th>`;
+                });
+                html += '</tr>';
+                
+                // Data rows (first 10)
+                const previewRows = csvData.slice(0, 10);
+                previewRows.forEach(row => {
+                    html += '<tr>';
+                    Object.values(row).forEach(value => {
+                        html += `<td>${value || ''}</td>`;
+                    });
+                    html += '</tr>';
+                });
+            }
+            
+            html += '</table>';
+            html += '</div>';
+            html += `<p style="color: #6b7280; margin-top: 15px;">Showing 10 of ${csvData.length} total rows</p>`;
+            
+            resultsContent.innerHTML = html;
+            resultsSection.style.display = 'block';
+        }
+
+        // Process data using current logic
+        function processData() {
+            if (!csvData) {
+                alert('Please upload a CSV file first');
+                return;
+            }
+            
+            const processing = document.getElementById('processingStatus');
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsContent = document.getElementById('resultsContent');
+            
+            processing.style.display = 'block';
+            resultsSection.style.display = 'none';
+            
+            // Simulate processing delay
+            setTimeout(() => {
+                try {
+                    const config = getProcessingConfig();
+                    const results = processCSVData(csvData, config);
+                    
+                    processing.style.display = 'none';
+                    displayResults(results);
+                    resultsSection.style.display = 'block';
+                } catch (error) {
+                    processing.style.display = 'none';
+                    resultsContent.innerHTML = `<div class="status-message status-error">❌ Processing Error: ${error.message}</div>`;
+                    resultsSection.style.display = 'block';
+                }
+            }, 2000);
+        }
+
+        // Get processing configuration from form
+        function getProcessingConfig() {
+            const year = parseInt(document.getElementById('targetYear').value);
+            const month = parseInt(document.getElementById('targetMonth').value);
+            const company = document.getElementById('companyCode').value;
+            const openingBalance = parseFloat(document.getElementById('openingBalance').value) || 0;
+            
+            const config = {
+                company,
+                year,
+                month,
+                openingBalance,
+                skipInvalid: document.getElementById('skipInvalidTransactions').checked,
+                generateSynthetic: document.getElementById('generateSyntheticTransactions').checked,
+                validateBalances: document.getElementById('validateBalances').checked,
+                payouts: payoutEntries  // Include payout data
+            };
+            
+            // Get allowed dates for August 2025 CGGE
+            if (year === 2025 && month === 8 && company === 'cgge') {
+                config.allowedDates = [];
+                [1, 4, 15, 17, 19].forEach(date => {
+                    if (document.getElementById(`date${date}`).checked) {
+                        config.allowedDates.push(date);
+                    }
+                });
+            }
+            
+            return config;
+        }
+
+        // Process CSV data using current logic
+        function processCSVData(data, config) {
+            const transactions = [];
+            let skipped = 0;
+            let errors = [];
+            
+            data.forEach((row, index) => {
+                try {
+                    // Parse date
+                    const dateStr = row['Created date (UTC)'] || row['Created (UTC)'];
+                    if (!dateStr) {
+                        if (!config.skipInvalid) errors.push(`Row ${index + 1}: Missing date`);
+                        skipped++;
+                        return;
+                    }
+                    
+                    const createdDate = new Date(dateStr.replace(' ', 'T') + 'Z');
+                    if (isNaN(createdDate.getTime())) {
+                        if (!config.skipInvalid) errors.push(`Row ${index + 1}: Invalid date format`);
+                        skipped++;
+                        return;
+                    }
+                    
+                    // Filter by year and month
+                    if (createdDate.getFullYear() !== config.year || 
+                        createdDate.getMonth() + 1 !== config.month) {
+                        skipped++;
+                        return;
+                    }
+                    
+                    // Check allowed dates
+                    if (config.allowedDates && !config.allowedDates.includes(createdDate.getDate())) {
+                        skipped++;
+                        return;
+                    }
+                    
+                    // Validate transaction
+                    const id = (row['id'] || '').toString().trim();
+                    const amountStr = (row['Converted Amount'] || row['Amount'] || '0').toString().replace(/[^\d.-]/g, '');
+                    const amount = parseFloat(amountStr) || 0;
+                    
+                    if (!id && config.skipInvalid) {
+                        skipped++;
+                        return;
+                    }
+                    
+                    if (amount === 0 && config.skipInvalid) {
+                        skipped++;
+                        return;
+                    }
+                    
+                    const feeStr = (row['Fee'] || '0').toString().replace(/[^\d.-]/g, '');
+                    const fee = parseFloat(feeStr) || 0;
+                    const net = amount - fee;
+                    
+                    transactions.push({
+                        id: id || `generated_${index}`,
+                        created: createdDate.toISOString(),
+                        date: createdDate.toISOString().split('T')[0],
+                        amount: amount,
+                        fee: fee,
+                        net: net,
+                        currency: row['Converted Currency'] || row['Currency'] || 'hkd',
+                        status: row['Status'] || 'unknown',
+                        description: row['Description'] || '',
+                        customer_email: row['Customer Email'] || '',
+                        metadata: {
+                            stripe_plan: row['stripe_plan (metadata)'] || '',
+                            site: row['1. Site (metadata)'] || row['site (metadata)'] || '',
+                            user_email: row['2. User email (metadata)'] || '',
+                            active_date: row['3. Active date (metadata)'] || '',
+                            expiry_date: row['4. Expiry date (metadata)'] || ''
+                        },
+                        raw_row: row
+                    });
+                } catch (error) {
+                    errors.push(`Row ${index + 1}: ${error.message}`);
+                    skipped++;
+                }
+            });
+            
+            // Sort transactions by date
+            transactions.sort((a, b) => new Date(a.created) - new Date(b.created));
+            
+            // Calculate running balances
+            let runningBalance = config.openingBalance;
+            transactions.forEach(tx => {
+                runningBalance += tx.net;
+                tx.running_balance = Math.round(runningBalance * 100) / 100;
+            });
+            
+            // Calculate summary
+            const totalAmount = transactions.reduce((sum, tx) => sum + tx.amount, 0);
+            const totalFees = transactions.reduce((sum, tx) => sum + tx.fee, 0);
+            const totalNet = transactions.reduce((sum, tx) => sum + tx.net, 0);
+            
+            return {
+                success: true,
+                config: config,
+                summary: {
+                    opening_balance: config.openingBalance,
+                    closing_balance: Math.round((config.openingBalance + totalNet) * 100) / 100,
+                    total_transactions: transactions.length,
+                    total_amount: Math.round(totalAmount * 100) / 100,
+                    total_fees: Math.round(totalFees * 100) / 100,
+                    total_net: Math.round(totalNet * 100) / 100,
+                    processed_rows: data.length,
+                    skipped_rows: skipped
+                },
+                transactions: transactions,
+                errors: errors
+            };
+        }
+
+        // Display processing results
+        function displayResults(results) {
+            const resultsContent = document.getElementById('resultsContent');
+            
+            let html = '<div class="status-message status-success">✅ Processing completed successfully!</div>';
+            
+            // Summary section
+            html += '<h3>📊 Summary</h3>';
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0;">';
+            
+            const summaryCards = [
+                { label: 'Opening Balance', value: `HK$${results.summary.opening_balance.toFixed(2)}`, color: '#6b7280' },
+                { label: 'Total Transactions', value: results.summary.total_transactions, color: '#10b981' },
+                { label: 'Gross Amount', value: `HK$${results.summary.total_amount.toFixed(2)}`, color: '#3b82f6' },
+                { label: 'Total Fees', value: `HK$${results.summary.total_fees.toFixed(2)}`, color: '#ef4444' },
+                { label: 'Net Amount', value: `HK$${results.summary.total_net.toFixed(2)}`, color: '#059669' },
+                { label: 'Closing Balance', value: `HK$${results.summary.closing_balance.toFixed(2)}`, color: '#7c3aed' }
+            ];
+            
+            summaryCards.forEach(card => {
+                html += `
+                    <div style="background: white; padding: 20px; border-radius: 10px; text-align: center; border-left: 4px solid ${card.color};">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: ${card.color};">${card.value}</div>
+                        <div style="color: #6b7280; font-size: 0.9rem; margin-top: 5px;">${card.label}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            // Processing stats
+            html += `
+                <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                    <strong>Processing Statistics:</strong><br>
+                    • Total rows processed: ${results.summary.processed_rows}<br>
+                    • Skipped rows: ${results.summary.skipped_rows}<br>
+                    • Valid transactions: ${results.summary.total_transactions}<br>
+                    • Company: ${results.config.company.toUpperCase()}<br>
+                    • Period: ${results.config.year}-${String(results.config.month).padStart(2, '0')}
+                </div>
+            `;
+            
+            // Errors section
+            if (results.errors.length > 0) {
+                html += '<div class="status-message status-warning">⚠️ Processing warnings/errors:</div>';
+                html += '<ul style="margin: 10px 0 20px 20px; color: #d97706;">';
+                results.errors.slice(0, 10).forEach(error => {
+                    html += `<li>${error}</li>`;
+                });
+                if (results.errors.length > 10) {
+                    html += `<li>... and ${results.errors.length - 10} more errors</li>`;
+                }
+                html += '</ul>';
+            }
+            
+            // Transactions table
+            if (results.transactions.length > 0) {
+                html += '<h3>💳 Transactions</h3>';
+                html += '<div style="overflow-x: auto; margin: 20px 0;">';
+                html += '<table class="preview-table">';
+                html += '<tr><th>Date</th><th>ID</th><th>Amount</th><th>Fee</th><th>Net</th><th>Balance</th><th>Status</th></tr>';
+                
+                results.transactions.forEach(tx => {
+                    html += `
+                        <tr>
+                            <td>${tx.date}</td>
+                            <td style="font-family: monospace; font-size: 0.8rem;">${tx.id}</td>
+                            <td>HK$${tx.amount.toFixed(2)}</td>
+                            <td>HK$${tx.fee.toFixed(2)}</td>
+                            <td>HK$${tx.net.toFixed(2)}</td>
+                            <td><strong>HK$${tx.running_balance.toFixed(2)}</strong></td>
+                            <td>${tx.status}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</table>';
+                html += '</div>';
+            }
+            
+            // Payout Analysis Section
+            if (payoutEntries.length > 0) {
+                html += '<h3>🏦 Payout Analysis & Reconciliation</h3>';
+                
+                const totalPayouts = payoutEntries.reduce((sum, entry) => sum + entry.amount, 0);
+                const transactionNet = results.summary.total_net;
+                const difference = transactionNet - totalPayouts;
+                const isReconciled = Math.abs(difference) < 0.01;
+                
+                // Reconciliation summary
+                html += `
+                    <div style="background: ${isReconciled ? '#dcfce7' : '#fef3c7'}; 
+                                border: 2px solid ${isReconciled ? '#10b981' : '#f59e0b'}; 
+                                border-radius: 10px; padding: 20px; margin: 20px 0;">
+                        <h4 style="color: ${isReconciled ? '#059669' : '#d97706'}; margin-bottom: 15px;">
+                            ${isReconciled ? '✅ Reconciliation Successful' : '⚠️ Reconciliation Warning'}
+                        </h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div><strong>Transaction Net:</strong> HK$${transactionNet.toFixed(2)}</div>
+                            <div><strong>Total Payouts:</strong> HK$${totalPayouts.toFixed(2)}</div>
+                            <div><strong>Difference:</strong> 
+                                <span style="color: ${difference >= 0 ? '#059669' : '#dc2626'};">
+                                    HK$${difference.toFixed(2)}
+                                </span>
+                            </div>
+                        </div>
+                        ${!isReconciled ? '<p style="margin-top: 10px; font-size: 0.9rem;">Note: Difference may be due to pending payouts or fee adjustments.</p>' : ''}
+                    </div>
+                `;
+                
+                // Payout entries table
+                html += '<h4>💳 Payout Entries</h4>';
+                html += '<div style="overflow-x: auto; margin: 20px 0;">';
+                html += '<table class="preview-table">';
+                html += '<tr><th>Date</th><th>Payout ID</th><th>Amount</th><th>Status</th><th>Description</th></tr>';
+                
+                payoutEntries.forEach(entry => {
+                    const statusColor = getStatusColor(entry.status);
+                    html += `
+                        <tr>
+                            <td>${entry.date}</td>
+                            <td style="font-family: monospace; font-size: 0.8rem;">${entry.payoutId}</td>
+                            <td><strong>HK$${entry.amount.toFixed(2)}</strong></td>
+                            <td><span style="color: ${statusColor};">●</span> ${entry.status.toUpperCase()}</td>
+                            <td>${entry.description || '-'}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</table>';
+                html += '</div>';
+            }
+            
+            // Export buttons
+            html += `
+                <div class="button-group" style="margin-top: 30px;">
+                    <button class="btn btn-primary" onclick="exportResults('json')">📁 Export JSON</button>
+                    <button class="btn btn-primary" onclick="exportResults('csv')">📊 Export CSV</button>
+                    <button class="btn btn-secondary" onclick="copyResults()">📋 Copy Results</button>
+                </div>
+            `;
+            
+            resultsContent.innerHTML = html;
+            processedResults = results;
+        }
+
+        // Export results
+        function exportResults(format) {
+            if (!processedResults) return;
+            
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `stripe-processed-${processedResults.config.company}-${processedResults.config.year}-${String(processedResults.config.month).padStart(2, '0')}-${timestamp}`;
+            
+            let content, mimeType;
+            
+            if (format === 'json') {
+                content = JSON.stringify(processedResults, null, 2);
+                mimeType = 'application/json';
+                downloadFile(content, `${filename}.json`, mimeType);
+            } else if (format === 'csv') {
+                const transactions = processedResults.transactions;
+                if (transactions.length === 0) return;
+                
+                const headers = ['Date', 'ID', 'Amount', 'Fee', 'Net', 'Running Balance', 'Currency', 'Status', 'Description', 'Customer Email'];
+                let csv = headers.join(',') + '\n';
+                
+                transactions.forEach(tx => {
+                    const row = [
+                        tx.date,
+                        `"${tx.id}"`,
+                        tx.amount,
+                        tx.fee,
+                        tx.net,
+                        tx.running_balance,
+                        tx.currency,
+                        tx.status,
+                        `"${tx.description.replace(/"/g, '""')}"`,
+                        tx.customer_email
+                    ];
+                    csv += row.join(',') + '\n';
+                });
+                
+                downloadFile(csv, `${filename}.csv`, 'text/csv');
+            }
+        }
+
+        // Download file helper
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Copy results to clipboard
+        function copyResults() {
+            if (!processedResults) return;
+            
+            const text = JSON.stringify(processedResults.summary, null, 2);
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Results copied to clipboard!');
+            });
+        }
+
+        // Download template CSV
+        function downloadTemplate() {
+            const template = `id,Created date (UTC),Amount,Fee,Currency,Converted Amount,Converted Currency,Status,Description,Customer Email,stripe_plan (metadata),1. Site (metadata),2. User email (metadata),3. Active date (metadata),4. Expiry date (metadata)
+py_3ExampleTransaction001,2025-08-01 10:15:30,90.00,4.10,cny,95.40,hkd,Paid,Monthly subscription,user@example.com,M1,Blender Studio CN,user@example.com,2025-08-01,2025-08-31
+py_3ExampleTransaction002,2025-08-04 14:22:15,90.00,4.12,cny,96.50,hkd,Paid,Monthly subscription,user2@example.com,M1,Blender Studio CN,user2@example.com,2025-08-04,2025-09-03`;
+            
+            downloadFile(template, 'stripe-csv-template.csv', 'text/csv');
+        }
+
+        // Reset form
+        function resetForm() {
+            document.getElementById('csvFile').value = '';
+            document.getElementById('fileStatus').innerHTML = '';
+            document.getElementById('resultsSection').style.display = 'none';
+            csvData = null;
+            processedResults = null;
+        }
+
+        // Event listeners for configuration changes
+        document.getElementById('targetYear').addEventListener('change', updateDateFilterVisibility);
+        document.getElementById('targetMonth').addEventListener('change', updateDateFilterVisibility);
+        document.getElementById('companyCode').addEventListener('change', updateDateFilterVisibility);
+
+        // Initialize
+        updateDateFilterVisibility();
+        
+        // Payout Management Functions
+        let payoutEntries = [];
+        
+        function addPayoutEntry() {
+            const date = document.getElementById('payoutDate').value;
+            const amount = parseFloat(document.getElementById('payoutAmount').value);
+            const id = document.getElementById('payoutId').value;
+            const status = document.getElementById('payoutStatus').value;
+            const description = document.getElementById('payoutDescription').value;
+            
+            // Validation
+            if (!date || isNaN(amount) || amount <= 0) {
+                alert('Please enter valid payout date and amount');
+                return;
+            }
+            
+            const entry = {
+                id: payoutEntries.length + 1,
+                date: date,
+                amount: amount,
+                payoutId: id || `po_${Date.now()}`,
+                status: status || 'paid',
+                description: description || '',
+                timestamp: new Date().toISOString()
+            };
+            
+            payoutEntries.push(entry);
+            updatePayoutDisplay();
+            clearPayoutForm();
+        }
+        
+        function clearPayouts() {
+            if (payoutEntries.length === 0) return;
+            
+            if (confirm('Are you sure you want to clear all payout entries?')) {
+                payoutEntries = [];
+                updatePayoutDisplay();
+            }
+        }
+        
+        function deletePayout(index) {
+            if (confirm('Delete this payout entry?')) {
+                payoutEntries.splice(index, 1);
+                updatePayoutDisplay();
+            }
+        }
+        
+        function editPayout(index) {
+            const entry = payoutEntries[index];
+            document.getElementById('payoutDate').value = entry.date;
+            document.getElementById('payoutAmount').value = entry.amount;
+            document.getElementById('payoutId').value = entry.payoutId;
+            document.getElementById('payoutStatus').value = entry.status;
+            document.getElementById('payoutDescription').value = entry.description;
+            
+            // Remove the entry so it can be re-added with modifications
+            payoutEntries.splice(index, 1);
+            updatePayoutDisplay();
+        }
+        
+        function updatePayoutDisplay() {
+            const container = document.getElementById('payoutList');
+            let html = '';
+            
+            if (payoutEntries.length === 0) {
+                html = '<p style="color: #6b7280; font-style: italic; margin-top: 15px;">No payout entries added yet.</p>';
+            } else {
+                // Calculate total payouts
+                const totalPayouts = payoutEntries.reduce((sum, entry) => sum + entry.amount, 0);
+                
+                // Summary
+                html += `
+                    <div class="payout-summary">
+                        <h4>📊 Payout Summary</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div><strong>Total Entries:</strong> ${payoutEntries.length}</div>
+                            <div><strong>Total Amount:</strong> HK$${totalPayouts.toFixed(2)}</div>
+                            <div><strong>Status Distribution:</strong> ${getStatusDistribution()}</div>
+                        </div>
+                    </div>
+                `;
+                
+                // Individual entries
+                payoutEntries.forEach((entry, index) => {
+                    const statusColor = getStatusColor(entry.status);
+                    html += `
+                        <div class="payout-entry">
+                            <div class="payout-info">
+                                <div class="payout-date">${entry.date}</div>
+                                <div class="payout-amount">HK$${entry.amount.toFixed(2)}</div>
+                                <div class="payout-details">
+                                    <span style="color: ${statusColor};">●</span> ${entry.status.toUpperCase()}
+                                    ${entry.payoutId ? ' • ' + entry.payoutId : ''}
+                                    ${entry.description ? '<br>' + entry.description : ''}
+                                </div>
+                            </div>
+                            <div class="payout-actions">
+                                <button class="edit-payout" onclick="editPayout(${index})">✏️ Edit</button>
+                                <button class="delete-payout" onclick="deletePayout(${index})">🗑️ Delete</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        function clearPayoutForm() {
+            document.getElementById('payoutDate').value = '';
+            document.getElementById('payoutAmount').value = '';
+            document.getElementById('payoutId').value = '';
+            document.getElementById('payoutStatus').value = '';
+            document.getElementById('payoutDescription').value = '';
+        }
+        
+        function getStatusColor(status) {
+            const colors = {
+                'paid': '#059669',
+                'pending': '#d97706',
+                'in_transit': '#3b82f6',
+                'canceled': '#6b7280',
+                'failed': '#ef4444'
+            };
+            return colors[status] || '#6b7280';
+        }
+        
+        function getStatusDistribution() {
+            const distribution = {};
+            payoutEntries.forEach(entry => {
+                distribution[entry.status] = (distribution[entry.status] || 0) + 1;
+            });
+            return Object.entries(distribution).map(([status, count]) => `${status}: ${count}`).join(', ');
+        }
+        
+        // Export payout data
+        function exportPayoutData() {
+            if (payoutEntries.length === 0) {
+                alert('No payout entries to export');
+                return;
+            }
+            
+            const csvContent = [
+                ['Date', 'Amount', 'Payout ID', 'Status', 'Description'],
+                ...payoutEntries.map(entry => [
+                    entry.date,
+                    entry.amount,
+                    entry.payoutId,
+                    entry.status,
+                    entry.description
+                ])
+            ].map(row => row.map(field => `"${field}"`).join(',')).join('\n');
+            
+            downloadFile(csvContent, 'stripe-payouts.csv', 'text/csv');
+        }
+    </script>
+</body>
+</html>
