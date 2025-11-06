@@ -1,93 +1,177 @@
-# stripe-dashboard
+# Stripe Dashboard - Monthly Statement Generator
 
+## 🎯 Project Overview
 
+A complete Flask-based solution for generating professional monthly statements in traditional debit/credit accounting format. Creates statements that match the exact format of CGGE-MonthlyStatement_2025_07.pdf with customer transaction summaries.
 
-## Getting started
+## ✨ Key Features
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+- **Traditional Debit/Credit Format**: Proper accounting methodology with running balance
+- **Customer Transaction Summary**: Separate section showing customer payments and details
+- **Statement Management**: Create, edit, save, and generate PDF statements
+- **Opening Balance Carryforward**: Auto-loads previous month's closing balance
+- **Multi-Company Support**: CGGE, Krystal Institute, Krystal Technology
+- **Professional PDF Generation**: Browser-based print-to-PDF functionality
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## 🚀 Quick Start
 
-## Add your files
+### Start the Server
+```bash
+python monthly_statement_generator.py
+```
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+### Access the Application
+Open your browser and go to: **http://localhost:8081**
+
+## 📁 Project Structure
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.kryedu.org/company_apps/stripe-dashboard.git
-git branch -M main
-git push -uf origin main
+stripe-dashboard/
+├── monthly_statement_generator.py    # Main application server
+├── manual_reconciliation_server.py   # Alternative reconciliation server
+├── production_server.py              # Legacy CSV processing server
+├── data/
+│   ├── monthly_statement_data.json       # Statement data storage
+│   └── manual_reconciliation_data.json   # Reconciliation data storage
+├── docs/
+│   ├── README.md                         # This file
+│   ├── MONTHLY_STATEMENT_SOLUTION.md     # Complete solution guide
+│   ├── CGGE-MonthlyStatement_2025_07.pdf # Reference format
+│   └── [Other documentation files]
+├── complete_csv/                     # Stripe CSV export files
+├── payout_reconciliation_cgge/       # Historical Stripe payout PDFs
+├── app/                              # Flask application components
+├── config/                           # Configuration files
+└── archive/                          # Archived old files
 ```
 
-## Integrate with your tools
+## 💼 Business Use Cases
 
-- [ ] [Set up project integrations](https://gitlab.kryedu.org/company_apps/stripe-dashboard/-/settings/integrations)
+### For CGGE, Krystal Institute, and Krystal Technology
+- Generate monthly financial statements
+- Track customer payments and transactions
+- Maintain proper debit/credit accounting records
+- Carry forward balances between months
+- Export professional PDF reports for accounting
 
-## Collaborate with your team
+## 📊 Statement Format
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+### Main Report Table
+- **Opening Balance**: Brought forward from previous month
+- **Transaction Details**: Date, Nature, Party, Debit/Credit, Running Balance
+- **Subtotals**: Summary of all debits and credits
+- **Closing Balance**: Carry forward to next month
 
-## Test and Deploy
+### Customer Transaction Summary
+- **Customer List**: Names and email addresses
+- **Transaction Amounts**: Individual payment details
+- **Total Summary**: Sum of all customer payments
 
-Use the built-in continuous integration in GitLab.
+## 🛠️ Technical Stack
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+- **Backend**: Python Flask
+- **Frontend**: HTML/CSS/JavaScript
+- **Data Storage**: JSON files
+- **PDF Generation**: Browser print-to-PDF
+- **Styling**: CSS Grid and Flexbox
 
-***
+## 📋 How to Use
 
-# Editing this README
+### 1. Create New Statement
+1. Click "Create Monthly Statement"
+2. Select company and period (YYYY-MM)
+3. Load opening balance from previous month
+4. Add individual transactions
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### 2. Add Transactions
+For each transaction specify:
+- **Date**: Transaction date
+- **Nature**: Gross Payment, Processing Fee, Payout, etc.
+- **Party**: Customer name/email or "Stripe"
+- **Amount Type**: Debit (increases) or Credit (decreases balance)
+- **Amount**: HKD amount
+- **Description**: Transaction details
 
-## Suggestions for a good README
+### 3. Manage Statements
+- **Save**: Persist data for future editing
+- **Edit**: Modify existing saved statements
+- **Generate PDF**: Create professional reports
+- **Delete**: Remove unwanted statements
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+## 💾 Data Management
 
-## Name
-Choose a self-explaining name for your project.
+### Statement Data
+- Stored in `data/monthly_statement_data.json`
+- Preserves creation and update timestamps
+- Maintains full transaction history
+- Supports backup and restore
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### Key Structure
+```json
+{
+  "company_period": {
+    "company": "cgge",
+    "period": "2025-08",
+    "opening_balance": 554.77,
+    "closing_balance": 0.00,
+    "transactions": [...]
+  }
+}
+```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+## 🎯 Current Status
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### Active Data (August 2025)
+- **CGGE**: 19 transactions, 5 customer payments (HK$480.99)
+- **KI**: No transactions (HK$1,427.61 opening balance)
+- **KT**: No transactions (HK$0.00 balance)
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+### Features Implemented
+✅ Traditional debit/credit format  
+✅ Running balance calculation  
+✅ Opening balance carryforward  
+✅ Customer transaction summary  
+✅ Statement editing capability  
+✅ Data persistence  
+✅ Professional PDF generation  
+✅ Multi-company support  
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+## 📚 Documentation
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+- **[Complete Solution Guide](docs/MONTHLY_STATEMENT_SOLUTION.md)**: Detailed feature documentation
+- **[Reference Format](docs/CGGE-MonthlyStatement_2025_07.pdf)**: Original PDF format to match
+- **[Deployment Guides](docs/)**: Various deployment documentation
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+## 🔧 Server Configuration
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### Main Server
+- **File**: `monthly_statement_generator.py`
+- **Port**: 8081
+- **Features**: Full statement management with edit capability
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+### Alternative Servers
+- **Manual Reconciliation**: `manual_reconciliation_server.py` (Port 8081)
+- **Legacy CSV Parser**: `production_server.py` (Various ports)
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## 🔄 Development History
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+This project evolved from a CSV processing system to a complete manual statement generator:
 
-## License
-For open source projects, say how it is licensed.
+1. **Phase 1**: CSV parsing and automated processing
+2. **Phase 2**: Manual reconciliation input system  
+3. **Phase 3**: Traditional debit/credit accounting format
+4. **Phase 4**: Customer transaction summary integration
+5. **Phase 5**: Statement editing and management features
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+## 📞 Support
+
+For technical issues or feature requests:
+- Review documentation in `docs/` directory
+- Check existing statement data in `data/` directory
+- Verify server logs for troubleshooting
+
+---
+
+**The Monthly Statement Generator provides a complete solution for professional accounting statement generation with traditional debit/credit format and customer transaction summaries.**
+
+**Access the application at: http://localhost:8081**

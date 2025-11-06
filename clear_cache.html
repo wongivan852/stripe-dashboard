@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cache Cleared - Redirecting</title>
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
+    <script>
+        // Clear any localStorage and sessionStorage
+        if (typeof(Storage) !== "undefined") {
+            localStorage.clear();
+            sessionStorage.clear();
+        }
+        
+        // Redirect to home with cache buster
+        setTimeout(function() {
+            window.location.href = 'http://127.0.0.1:8081/?nocache=' + Date.now();
+        }, 1000);
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 100px;
+            background: #f8fafc;
+        }
+        .message {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            display: inline-block;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="message">
+        <h2>🧹 Clearing Cache...</h2>
+        <p>Redirecting to the latest version of the application...</p>
+        <p><strong>If not redirected automatically, click here:</strong></p>
+        <a href="http://127.0.0.1:8081/?nocache=12345" style="color: #4f46e5; font-weight: bold;">Open Latest Version</a>
+    </div>
+</body>
+</html>

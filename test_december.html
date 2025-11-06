@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test December Statement</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .opening-balance { background-color: #f0f9ff; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Test December 2021 Statement</h1>
+    <button onclick="testDecember()">Test December Statement</button>
+    <div id="results"></div>
+    
+    <script>
+        async function testDecember() {
+            try {
+                console.log('Testing December 2021 statement...');
+                const response = await fetch('http://127.0.0.1:8081/analytics/api/monthly-statement?company=cgge&year=2021&month=12');
+                const data = await response.json();
+                
+                console.log('API Response:', data);
+                
+                if (data.success) {
+                    const statement = data.statement;
+                    console.log('Opening balance:', statement.opening_balance);
+                    console.log('Transactions count:', statement.transactions.length);
+                    
+                    let html = `
+                        <h2>December 2021 Statement for CGGE</h2>
+                        <p><strong>Opening Balance:</strong> HK$${statement.opening_balance.toFixed(2)}</p>
+                        <p><strong>Closing Balance:</strong> HK$${statement.closing_balance.toFixed(2)}</p>
+                        <p><strong>Transactions:</strong> ${statement.transactions.length}</p>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Nature</th>
+                                    <th>Party</th>
+                                    <th>Debit</th>
+                                    <th>Credit</th>
+                                    <th>Balance</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="opening-balance">
+                                    <td>2021-12-01</td>
+                                    <td>Opening Balance</td>
+                                    <td>Brought Forward</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td>HK$${statement.opening_balance.toFixed(2)}</td>
+                                    <td>Opening balance for December 2021</td>
+                                </tr>
+                    `;
+                    
+                    statement.transactions.forEach(tx => {
+                        html += `
+                            <tr>
+                                <td>${tx.date}</td>
+                                <td>${tx.nature}</td>
+                                <td>${tx.party}</td>
+                                <td>${tx.debit > 0 ? 'HK$' + parseFloat(tx.debit).toFixed(2) : ''}</td>
+                                <td>${tx.credit > 0 ? 'HK$' + parseFloat(tx.credit).toFixed(2) : ''}</td>
+                                <td>HK$${parseFloat(tx.balance).toFixed(2)}</td>
+                                <td>${tx.description}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += `
+                                <tr class="opening-balance">
+                                    <td>2021-12-31</td>
+                                    <td>Closing Balance</td>
+                                    <td>Carry Forward</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td>HK$${statement.closing_balance.toFixed(2)}</td>
+                                    <td>Closing balance for December 2021</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    document.getElementById('results').innerHTML = html;
+                } else {
+                    document.getElementById('results').innerHTML = 'Error: ' + data.error;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('results').innerHTML = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

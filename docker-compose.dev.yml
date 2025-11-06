@@ -1,0 +1,90 @@
+# Development Docker Compose for macOS Development Environment
+# Hot-reload and debugging optimized
+
+version: '3.8'
+
+services:
+  # Development Stripe Dashboard
+  stripe-dashboard-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.multi-stage
+      target: builder
+    container_name: stripe-dashboard-dev
+    restart: "no"
+    
+    # Development environment
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=true
+      - DATABASE_URL=sqlite:///app/instance/development.db
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - HOST=0.0.0.0
+      - PORT=5000
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    
+    # Port mapping for development
+    ports:
+      - "5000:5000"
+      - "5678:5678"  # Debug port
+    
+    # Volume mounts for hot reload
+    volumes:
+      # Source code hot reload
+      - .:/app
+      # Separate development database
+      - dev_db_data:/app/instance
+      # Development logs
+      - ./logs:/app/logs
+      # Development CSV data
+      - ./csv_data:/app/csv_data
+      - ./july25:/app/july25
+    
+    # Development command with hot reload
+    command: python -m flask run --host=0.0.0.0 --port=5000 --reload --debugger
+    
+    # Networks
+    networks:
+      - dev_network
+    
+    # Development tools
+    stdin_open: true
+    tty: true
+
+  # Development database viewer (Adminer)
+  adminer:
+    image: adminer:4.8.1
+    container_name: stripe-dashboard-adminer
+    restart: "no"
+    
+    ports:
+      - "8080:8080"
+    
+    environment:
+      - ADMINER_DEFAULT_SERVER=sqlite
+    
+    networks:
+      - dev_network
+
+  # Development Redis (if needed)
+  redis-dev:
+    image: redis:7-alpine
+    container_name: stripe-dashboard-redis-dev
+    restart: "no"
+    
+    ports:
+      - "6379:6379"
+    
+    networks:
+      - dev_network
+
+# Development network
+networks:
+  dev_network:
+    driver: bridge
+
+# Development volumes
+volumes:
+  dev_db_data:
+    driver: local
