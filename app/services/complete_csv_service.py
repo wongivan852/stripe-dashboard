@@ -21,7 +21,8 @@ class CompleteCsvService:
         self.company_names = {
             "cgge": "CGGE",
             "ki": "Krystal Institute",
-            "kt": "Krystal Technology"
+            "kt": "Krystal Technology",
+            "cgge_sz": "CGGE (Shenzhen) Technology Limited"
         }
 
         self._validate_csv_directory()
@@ -84,6 +85,18 @@ class CompleteCsvService:
                 csv_files.append((file_path, company_code, 'unified'))
                 self.logger.info(f"Found unified file: {filename}")
 
+            # Look for WeChat trade data files (cgge_sz)
+            wechat_patterns = [
+                os.path.join(self.root_directory, "cgge_sz_*TRADE_DATA*.csv"),
+                os.path.join(self.root_directory, "*MONTH_TRADE_DATA*.csv"),  # WeChat export format
+            ]
+            for wechat_pattern in wechat_patterns:
+                wechat_files = glob.glob(wechat_pattern)
+                for file_path in wechat_files:
+                    filename = os.path.basename(file_path)
+                    csv_files.append((file_path, 'cgge_sz', 'wechat'))
+                    self.logger.info(f"Found WeChat file: {filename}")
+
             # Then look in complete_csv directory
             pattern = os.path.join(self.csv_directory, "*.csv")
             files = glob.glob(pattern)
@@ -106,11 +119,14 @@ class CompleteCsvService:
     def _extract_company_from_filename(self, filename):
         """Extract company code from filename"""
         filename_lower = filename.lower()
-        
-        if filename_lower.startswith('cgge_'):
+
+        # Check cgge_sz first (more specific)
+        if filename_lower.startswith('cgge_sz_'):
+            return 'cgge_sz'
+        elif filename_lower.startswith('cgge_'):
             return 'cgge'
         elif filename_lower.startswith('ki_'):
-            return 'ki' 
+            return 'ki'
         elif filename_lower.startswith('kt_'):
             return 'kt'
         else:
@@ -146,6 +162,8 @@ class CompleteCsvService:
             try:
                 if file_type == 'unified':
                     transactions = self._read_unified_csv_file(csv_file, company_code)
+                elif file_type == 'wechat':
+                    transactions = self._read_wechat_csv_file(csv_file, company_code)
                 else:
                     transactions = self._read_csv_file(csv_file, company_code)
                 all_transactions.extend(transactions)
@@ -182,6 +200,130 @@ class CompleteCsvService:
 
         except Exception as e:
             self.logger.error(f"Error reading unified CSV file {csv_file}: {e}")
+
+        return transactions
+
+    def _read_wechat_csv_file(self, csv_file, company_code):
+        """
+        Read and parse WeChat trade data CSV file (GB2312 encoded, Chinese format).
+
+        WeChat CSV format:
+        - First line: #起始月份：2024-12  终止月份：2025-12  (date range)
+        - Second line: Header for totals (销售金额总计(元),销售总笔数,人均金额(元))
+        - Third line: Total summary values
+        - Fourth line: Header for monthly data (月份,销售金额(元),销售笔数,人均金额)
+        - Remaining lines: Monthly data (YYYY-MM, amount, count, avg)
+        """
+        transactions = []
+
+        try:
+            # Read file with GB2312 encoding (common for WeChat exports)
+            with open(csv_file, 'rb') as f:
+                content = f.read()
+
+            # Try different encodings
+            decoded_content = None
+            for encoding in ['gb2312', 'gbk', 'gb18030', 'utf-8']:
+                try:
+                    decoded_content = content.decode(encoding)
+                    self.logger.info(f"WeChat file decoded with {encoding}")
+                    break
+                except (UnicodeDecodeError, LookupError):
+                    continue
+
+            if not decoded_content:
+                self.logger.error(f"Could not decode WeChat file {csv_file}")
+                return []
+
+            lines = decoded_content.strip().split('\n')
+            if len(lines) < 5:
+                self.logger.warning(f"WeChat file {csv_file} has too few lines")
+                return []
+
+            # Parse monthly data (starting from line 5, index 4)
+            for i, line in enumerate(lines[4:], start=5):
+                line = line.strip()
+                if not line:
+                    continue
+
+                # Parse: YYYY-MM,"amount","count","avg"
+                # Use csv module to properly handle quoted fields with commas
+                import io
+                reader = csv.reader(io.StringIO(line))
+                try:
+                    parts = next(reader)
+                except StopIteration:
+                    continue
+
+                if len(parts) < 3:
+                    continue
+
+                month_str = parts[0].strip()
+                amount_str = parts[1].strip().replace(',', '')  # Remove thousands separator
+                count_str = parts[2].strip()
+
+                # Parse month (YYYY-MM)
+                try:
+                    year_month = datetime.strptime(month_str, '%Y-%m')
+                except ValueError:
+                    self.logger.warning(f"Could not parse month: {month_str}")
+                    continue
+
+                # Parse amount (in CNY/RMB)
+                try:
+                    amount = Decimal(amount_str)
+                except (InvalidOperation, ValueError):
+                    self.logger.warning(f"Could not parse amount: {amount_str}")
+                    continue
+
+                # Parse transaction count
+                try:
+                    tx_count = int(count_str)
+                except ValueError:
+                    tx_count = 1
+
+                # Skip zero amounts
+                if amount <= 0:
+                    continue
+
+                # Create a monthly summary transaction
+                # Note: WeChat data is monthly summary, not individual transactions
+                # We'll create one transaction per month representing total sales
+                tx_date = year_month.date()
+                last_day = self._get_last_day_of_month(year_month.year, year_month.month)
+                tx_date = datetime(year_month.year, year_month.month, last_day).date()
+
+                transactions.append({
+                    'id': f"wechat_{company_code}_{month_str}",
+                    'stripe_id': f"wechat_{month_str}",
+                    'date': tx_date,
+                    'nature': 'WeChat Sales',
+                    'party': 'WeChat Customers',
+                    'debit': float(amount),  # Income increases balance
+                    'credit': 0,
+                    'balance': 0,
+                    'acknowledged': False,
+                    'description': f"WeChat sales for {month_str} ({tx_count} transactions)",
+                    'gross': float(amount),
+                    'amount': float(amount),
+                    'fee': 0,  # WeChat fees are typically handled separately
+                    'net_amount': float(amount),
+                    'currency': 'CNY',
+                    'status': 'succeeded',
+                    'type': 'wechat_payment',
+                    'created': datetime.combine(tx_date, datetime.min.time()),
+                    'available_on': tx_date,
+                    'transfer_date': tx_date,
+                    'account_name': self.company_names.get(company_code, 'CGGE (Shenzhen)'),
+                    'company_code': company_code,
+                    'reporting_category': 'wechat_sales',
+                    'transaction_count': tx_count
+                })
+
+            self.logger.info(f"Parsed {len(transactions)} monthly entries from WeChat file")
+
+        except Exception as e:
+            self.logger.error(f"Error reading WeChat CSV file {csv_file}: {e}")
 
         return transactions
 
@@ -1094,6 +1236,188 @@ class CompleteCsvService:
         self.logger.info(f"Built party lookup with {len(lookup)} entries")
         return lookup
 
+    def _generate_wechat_monthly_statement(self, year, month, start_day=1, end_day=None):
+        """
+        Generate monthly statement for CGGE (Shenzhen) WeChat data.
+
+        WeChat data is monthly summary data (total sales per month), not individual transactions.
+        This method generates a simplified statement format suitable for WeChat data.
+        """
+        company_filter = 'cgge_sz'
+
+        # Determine date range
+        start_date = datetime(year, month, start_day).date()
+        if end_day is None:
+            if month == 12:
+                end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            else:
+                end_date = datetime(year, month + 1, 1).date() - timedelta(days=1)
+        else:
+            end_date = datetime(year, month, end_day).date()
+
+        # Get WeChat transactions
+        all_transactions = self.import_transactions_from_csv()
+
+        # Filter for cgge_sz transactions in the specified month
+        monthly_transactions = []
+        for tx in all_transactions:
+            if tx.get('company_code') != 'cgge_sz':
+                continue
+            tx_date = tx.get('date')
+            if tx_date and tx_date.year == year and tx_date.month == month:
+                monthly_transactions.append(tx)
+
+        if not monthly_transactions:
+            return {'error': f'No WeChat data found for cgge_sz {year}-{month:02d}. Upload a WeChat TRADE_DATA CSV file.'}
+
+        # Calculate totals
+        total_sales = Decimal('0')
+        total_transactions = 0
+
+        for tx in monthly_transactions:
+            total_sales += Decimal(str(tx.get('gross', 0)))
+            total_transactions += tx.get('transaction_count', 1)
+
+        # Get previous month's closing balance as opening balance
+        opening_balance = Decimal(str(self._get_previous_month_closing_balance(year, month, company_filter)))
+
+        # WeChat typically doesn't have separate payouts in the same way Stripe does
+        # The sales amount is the net amount received
+        closing_balance = opening_balance + total_sales
+
+        # Build transaction list for display
+        all_statement_transactions = []
+        running_balance = opening_balance
+
+        # Add opening balance entry
+        all_statement_transactions.append({
+            'date': start_date,
+            'type': 'opening_balance',
+            'nature': 'Opening Balance',
+            'party': 'Brought Forward',
+            'description': f'Opening balance for {start_date.strftime("%B %Y")}',
+            'gross': 0,
+            'fee': 0,
+            'net': 0,
+            'debit': 0,
+            'credit': float(opening_balance) if opening_balance >= 0 else 0,
+            'balance': float(running_balance),
+            'acknowledged': 'Yes',
+            'category': 'balance'
+        })
+
+        # Add WeChat transaction entries
+        for tx in monthly_transactions:
+            gross = Decimal(str(tx.get('gross', 0)))
+            running_balance += gross
+
+            all_statement_transactions.append({
+                'date': tx.get('created') or tx.get('date'),
+                'type': 'wechat_sales',
+                'nature': 'WeChat Sales',
+                'party': 'WeChat Customers',
+                'description': tx.get('description', 'WeChat Sales'),
+                'gross': float(gross),
+                'fee': 0,
+                'net': float(gross),
+                'debit': float(gross),
+                'credit': 0,
+                'balance': float(running_balance),
+                'acknowledged': 'No',
+                'category': 'activity',
+                'transaction_count': tx.get('transaction_count', 0),
+                'currency': 'CNY'
+            })
+
+        # Add subtotal
+        total_debit = float(total_sales)
+        all_statement_transactions.append({
+            'date': end_date,
+            'type': 'subtotal',
+            'nature': 'SUBTOTAL',
+            'party': '',
+            'description': '',
+            'debit': total_debit,
+            'credit': 0,
+            'gross': 0,
+            'fee': 0,
+            'net': 0,
+            'balance': 0,
+            'acknowledged': '',
+            'category': 'subtotal'
+        })
+
+        # Add closing balance entry
+        all_statement_transactions.append({
+            'date': end_date,
+            'type': 'closing_balance',
+            'nature': 'Closing Balance',
+            'party': 'Carry Forward',
+            'description': f'Closing balance for {end_date.strftime("%B %Y")}',
+            'gross': 0,
+            'fee': 0,
+            'net': 0,
+            'debit': 0,
+            'credit': float(closing_balance) if closing_balance >= 0 else 0,
+            'balance': float(closing_balance),
+            'acknowledged': 'Yes',
+            'category': 'balance'
+        })
+
+        return {
+            'period': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'year': year,
+                'month': month
+            },
+            'company': company_filter,
+            'currency': 'CNY',
+            'summary': {
+                'opening_balance': float(opening_balance),
+                'activity': {
+                    'gross': float(total_sales),
+                    'fee': 0,
+                    'net': float(total_sales)
+                },
+                'payouts': {
+                    'gross': 0,
+                    'fee': 0,
+                    'net': 0
+                },
+                'closing_balance': float(closing_balance)
+            },
+            'statistics': {
+                'charge_count': total_transactions,
+                'charge_gross': float(total_sales),
+                'charge_fees': 0,
+                'charge_net': float(total_sales),
+                'refund_count': 0,
+                'refund_gross': 0,
+                'payout_count': 0,
+                'payout_total': 0
+            },
+            'transactions': all_statement_transactions,
+            'sales_details': [{
+                'sale_number': i + 1,
+                'date': (tx.get('date') or tx.get('created')).strftime('%Y-%m-%d') if tx.get('date') or tx.get('created') else '',
+                'amount': tx.get('gross', 0),
+                'customer_email': 'WeChat Customer',
+                'user_name': 'WeChat Users',
+                'site_service': 'WeChat Pay',
+                'subscription_plan': '',
+                'active_date': '',
+                'expiry_date': 'N/A',
+                'original_amount': f"{tx.get('gross', 0)} CNY",
+                'converted_amount': tx.get('gross', 0),
+                'processing_fee': 0,
+                'customer_id': '',
+                'transaction_id': tx.get('id', ''),
+                'transaction_count': tx.get('transaction_count', 0)
+            } for i, tx in enumerate(monthly_transactions)],
+            'source': 'wechat_data'
+        }
+
     def generate_monthly_statement_from_stripe_reports(self, year, month, company_filter, start_day=1, end_day=None):
         """
         Generate a complete monthly statement using the 3 Stripe report CSV files:
@@ -1104,8 +1428,14 @@ class CompleteCsvService:
         If the Stripe report doesn't cover the full month (e.g., ends on Nov 29),
         this method will supplement with data from the unified file.
 
+        For cgge_sz (WeChat), uses WeChat-specific statement generation.
+
         This is the authoritative source for monthly statements.
         """
+        # Handle WeChat (cgge_sz) separately
+        if company_filter == 'cgge_sz':
+            return self._generate_wechat_monthly_statement(year, month, start_day, end_day)
+
         # Determine date range
         start_date = datetime(year, month, start_day).date()
         if end_day is None:

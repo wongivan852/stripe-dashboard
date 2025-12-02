@@ -4975,7 +4975,7 @@ def csv_upload():
 
         # Get selected company from form
         selected_company = request.form.get('company', 'cgge').lower()
-        company_map = {'cgge': 'CGGE', 'ki': 'KI', 'kt': 'KT'}
+        company_map = {'cgge': 'CGGE', 'ki': 'KI', 'kt': 'KT', 'cgge_sz': 'CGGE_SZ'}
 
         if clear_db:
             # Clear existing transactions for the account being uploaded
@@ -5012,7 +5012,7 @@ def csv_upload():
 
             # Add company prefix if not already present
             filename_lower = original_filename.lower()
-            if not any(filename_lower.startswith(prefix) for prefix in ['cgge_', 'ki_', 'kt_']):
+            if not any(filename_lower.startswith(prefix) for prefix in ['cgge_', 'ki_', 'kt_', 'cgge_sz_']):
                 filename = f"{selected_company}_{original_filename}"
             else:
                 filename = original_filename
