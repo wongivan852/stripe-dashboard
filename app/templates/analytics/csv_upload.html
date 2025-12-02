@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Data Upload - Stripe Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #1e293b;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            color: #64748b;
+            font-size: 1.1rem;
+        }
+        
+        .upload-card {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .upload-area {
+            border: 3px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #f8fafc;
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        
+        .upload-area.drag-over {
+            border-color: #667eea;
+            background: #e0e7ff;
+            transform: scale(1.02);
+        }
+        
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        
+        .upload-text {
+            font-size: 1.2rem;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        
+        .upload-subtext {
+            color: #64748b;
+            margin-bottom: 1.5rem;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .btn {
+            padding: 12px 28px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #64748b;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #475569;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .file-list {
+            margin-top: 2rem;
+        }
+        
+        .file-item {
+            background: #f8fafc;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .file-name {
+            font-weight: 500;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .file-size {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        
+        .remove-file {
+            background: #fee2e2;
+            color: #dc2626;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .remove-file:hover {
+            background: #fecaca;
+        }
+        
+        .options-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 8px;
+        }
+        
+        .option-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 1rem 0;
+        }
+        
+        .option-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .option-item label {
+            font-weight: 500;
+            color: #1e293b;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            display: none;
+        }
+        
+        .warning-box.show {
+            display: block;
+        }
+        
+        .warning-text {
+            color: #92400e;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+        
+        .message {
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            display: none;
+            font-weight: 500;
+        }
+        
+        .message.success {
+            background: #dcfce7;
+            border: 2px solid #22c55e;
+            color: #166534;
+        }
+        
+        .message.error {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+            color: #991b1b;
+        }
+        
+        .message.show {
+            display: block;
+        }
+        
+        .info-section {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+            border-left: 4px solid #667eea;
+        }
+        
+        .info-section h3 {
+            color: #1e293b;
+            margin-bottom: 1rem;
+        }
+        
+        .info-section ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .info-section li {
+            padding: 0.5rem 0;
+            color: #475569;
+            display: flex;
+            align-items: start;
+            gap: 8px;
+        }
+        
+        .info-section li::before {
+            content: "✓";
+            color: #22c55e;
+            font-weight: bold;
+        }
+        
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+        }
+        
+        .back-link:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .upload-area {
+                padding: 2rem 1rem;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="monthly-statement" class="back-link">
+            ← Back to Monthly Statement
+        </a>
+        
+        <div class="header">
+            <h1>📤 CSV Data Upload</h1>
+            <p>Import multiple CSV files to update transaction data</p>
+        </div>
+
+        <div class="message" id="message"></div>
+
+        <div class="upload-card">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="company-selector" style="margin-bottom: 1.5rem; padding: 1.5rem; background: #f0fdf4; border: 2px solid #22c55e; border-radius: 8px;">
+                    <h3 style="margin-bottom: 1rem; color: #166534;">🏢 Select Company</h3>
+                    <p style="color: #15803d; margin-bottom: 1rem; font-size: 0.9rem;">Files will be automatically prefixed with the selected company code</p>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: white; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                            <input type="radio" name="company" value="cgge" checked style="width: 18px; height: 18px;">
+                            <span style="font-weight: 600; color: #1e293b;">CGGE</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: white; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                            <input type="radio" name="company" value="ki" style="width: 18px; height: 18px;">
+                            <span style="font-weight: 600; color: #1e293b;">Krystal Institute</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: white; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                            <input type="radio" name="company" value="kt" style="width: 18px; height: 18px;">
+                            <span style="font-weight: 600; color: #1e293b;">Krystal Technology</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">Click to browse or drag & drop files here</div>
+                    <div class="upload-subtext">Supports multiple CSV files</div>
+                    <input type="file" id="fileInput" class="file-input" accept=".csv" multiple>
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                        📂 Select Files
+                    </button>
+                </div>
+                
+                <div class="file-list" id="fileList"></div>
+                
+                <div class="options-section">
+                    <h3 style="margin-bottom: 1rem; color: #1e293b;">⚙️ Import Options</h3>
+                    
+                    <div class="option-item">
+                        <input type="checkbox" id="clearDatabase" name="clear_database">
+                        <label for="clearDatabase">
+                            <strong>Clear existing data before import</strong>
+                            <br>
+                            <small style="color: #64748b;">This will remove all existing transactions before importing new data</small>
+                        </label>
+                    </div>
+                    
+                    <div class="warning-box" id="warningBox">
+                        <div class="warning-text">
+                            ⚠️ Warning: This will permanently delete all existing transaction data!
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+                        ⬆️ Upload & Import
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="clearFiles()">
+                        🗑️ Clear Selection
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="info-section">
+            <h3>📋 Expected CSV Format</h3>
+            <ul>
+                <li>CSV files must contain transaction data from Stripe exports</li>
+                <li>Required columns: id, Amount, Currency, Fee, Status, Created date (UTC)</li>
+                <li>File names should include account identifier (cgge, ki, or kt)</li>
+                <li>You can upload up to 4 files at once (unified payments + 3 monthly summaries)</li>
+                <li>Duplicate transactions (same ID) will be skipped automatically unless database is cleared</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const clearCheckbox = document.getElementById('clearDatabase');
+        const warningBox = document.getElementById('warningBox');
+        const messageDiv = document.getElementById('message');
+        
+        let selectedFiles = [];
+        
+        // Drag and drop handlers
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            handleFiles(e.dataTransfer.files);
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+        
+        clearCheckbox.addEventListener('change', (e) => {
+            warningBox.classList.toggle('show', e.target.checked);
+        });
+        
+        function handleFiles(files) {
+            selectedFiles = Array.from(files).filter(f => f.name.endsWith('.csv'));
+            updateFileList();
+            uploadBtn.disabled = selectedFiles.length === 0;
+        }
+        
+        function updateFileList() {
+            if (selectedFiles.length === 0) {
+                fileList.innerHTML = '';
+                return;
+            }
+            
+            const html = selectedFiles.map((file, index) => `
+                <div class="file-item">
+                    <div class="file-name">
+                        📄 ${file.name}
+                        <span class="file-size">(${formatFileSize(file.size)})</span>
+                    </div>
+                    <button type="button" class="remove-file" onclick="removeFile(${index})">Remove</button>
+                </div>
+            `).join('');
+            
+            fileList.innerHTML = html;
+        }
+        
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+            uploadBtn.disabled = selectedFiles.length === 0;
+        }
+        
+        function clearFiles() {
+            selectedFiles = [];
+            fileInput.value = '';
+            updateFileList();
+            uploadBtn.disabled = true;
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        function showMessage(text, type) {
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type} show`;
+            setTimeout(() => {
+                messageDiv.classList.remove('show');
+            }, 5000);
+        }
+        
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (selectedFiles.length === 0) {
+                showMessage('Please select at least one CSV file', 'error');
+                return;
+            }
+            
+            if (clearCheckbox.checked) {
+                if (!confirm('Are you sure you want to clear all existing data? This action cannot be undone!')) {
+                    return;
+                }
+            }
+            
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '⏳ Uploading...';
+            
+            const formData = new FormData();
+            const selectedCompany = document.querySelector('input[name="company"]:checked').value;
+            selectedFiles.forEach(file => {
+                formData.append('csv_files', file);
+            });
+            formData.append('company', selectedCompany);
+            formData.append('clear_database', clearCheckbox.checked ? 'true' : 'false');
+            
+            try {
+                const response = await fetch('csv-upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                    clearFiles();
+                    clearCheckbox.checked = false;
+                    warningBox.classList.remove('show');
+                    
+                    // Redirect to monthly statement after successful upload
+                    setTimeout(() => {
+                        window.location.href = 'monthly-statement';
+                    }, 2000);
+                } else {
+                    showMessage('Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Upload failed: ' + error.message, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '⬆️ Upload & Import';
+            }
+        });
+    </script>
+</body>
+</html>

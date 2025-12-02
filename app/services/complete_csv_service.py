@@ -9,21 +9,37 @@ from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 
 class CompleteCsvService:
     """Service to import and process complete CSV data for monthly statements"""
-    
+
     def __init__(self, csv_directory=None):
         self.logger = logging.getLogger(__name__)
-        
+
         if csv_directory is None:
             csv_directory = self._resolve_csv_directory()
-        
+
         self.csv_directory = csv_directory
+        self.root_directory = self._resolve_root_directory()
         self.company_names = {
-            "cgge": "CGGE", 
+            "cgge": "CGGE",
             "ki": "Krystal Institute",
             "kt": "Krystal Technology"
         }
-        
+
         self._validate_csv_directory()
+
+    def _resolve_root_directory(self):
+        """Resolve root directory where unified CSV files may be located"""
+        possible_paths = [
+            os.environ.get('ROOT_CSV_PATH'),
+            os.getcwd(),
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            '/app',
+        ]
+
+        for path in possible_paths:
+            if path and os.path.exists(path):
+                return path
+
+        return os.getcwd()
     
     def _resolve_csv_directory(self):
         """Resolve complete_csv directory path"""
@@ -54,24 +70,35 @@ class CompleteCsvService:
             self.logger.error(f"Failed to create complete_csv directory {self.csv_directory}: {e}")
     
     def _find_csv_files(self):
-        """Find all CSV files in complete_csv directory"""
+        """Find all CSV files in complete_csv directory and root directory (for unified files)"""
         csv_files = []
-        
+
         try:
+            # First, look for unified files in root directory (priority)
+            unified_pattern = os.path.join(self.root_directory, "*unified_payments*.csv")
+            unified_files = glob.glob(unified_pattern)
+
+            for file_path in unified_files:
+                filename = os.path.basename(file_path)
+                company_code = self._extract_company_from_filename(filename)
+                csv_files.append((file_path, company_code, 'unified'))
+                self.logger.info(f"Found unified file: {filename}")
+
+            # Then look in complete_csv directory
             pattern = os.path.join(self.csv_directory, "*.csv")
             files = glob.glob(pattern)
-            
+
             for file_path in files:
                 filename = os.path.basename(file_path)
                 # Skip backup files
                 if '_backup.csv' in filename.lower():
                     continue
                 company_code = self._extract_company_from_filename(filename)
-                csv_files.append((file_path, company_code))
-            
-            self.logger.info(f"Found {len(csv_files)} CSV files in {self.csv_directory}")
+                csv_files.append((file_path, company_code, 'complete'))
+
+            self.logger.info(f"Found {len(csv_files)} CSV files total")
             return csv_files
-            
+
         except Exception as e:
             self.logger.error(f"Error finding CSV files: {e}")
             return []
@@ -90,28 +117,271 @@ class CompleteCsvService:
             return 'unknown'
     
     def import_transactions_from_csv(self):
-        """Import all transactions from complete_csv files"""
+        """Import all transactions from CSV files (unified files take priority)"""
         all_transactions = []
         csv_files = self._find_csv_files()
-        
+
         if not csv_files:
             self.logger.warning("No CSV files found to import")
             return []
-        
-        for csv_file, company_code in csv_files:
+
+        # Track which companies have unified files (they take priority)
+        unified_companies = set()
+
+        # First pass: identify companies with unified files
+        for csv_file_info in csv_files:
+            csv_file, company_code, file_type = csv_file_info
+            if file_type == 'unified':
+                unified_companies.add(company_code)
+
+        # Second pass: import transactions
+        for csv_file_info in csv_files:
+            csv_file, company_code, file_type = csv_file_info
+
+            # Skip complete_csv files if we have unified file for this company
+            if file_type == 'complete' and company_code in unified_companies:
+                self.logger.info(f"Skipping {os.path.basename(csv_file)} (unified file takes priority)")
+                continue
+
             try:
-                transactions = self._read_csv_file(csv_file, company_code)
+                if file_type == 'unified':
+                    transactions = self._read_unified_csv_file(csv_file, company_code)
+                else:
+                    transactions = self._read_csv_file(csv_file, company_code)
                 all_transactions.extend(transactions)
                 self.logger.info(f"Imported {len(transactions)} transactions from {os.path.basename(csv_file)}")
             except Exception as e:
                 self.logger.error(f"Error reading {csv_file}: {e}")
                 continue
-        
+
         # Sort by created date
         all_transactions.sort(key=lambda x: x.get('created') or datetime.min)
-        
+
         self.logger.info(f"Total imported transactions: {len(all_transactions)}")
         return all_transactions
+
+    def _read_unified_csv_file(self, csv_file, company_code):
+        """Read and parse unified payments CSV file (matches Stripe reports)"""
+        transactions = []
+
+        try:
+            with open(csv_file, 'r', newline='', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+
+                for row in reader:
+                    try:
+                        parsed = self._parse_unified_row(row, company_code)
+                        if parsed:
+                            if isinstance(parsed, list):
+                                transactions.extend(parsed)
+                            else:
+                                transactions.append(parsed)
+                    except Exception as e:
+                        self.logger.warning(f"Error parsing row in {csv_file}: {e}")
+                        continue
+
+        except Exception as e:
+            self.logger.error(f"Error reading unified CSV file {csv_file}: {e}")
+
+        return transactions
+
+    def _parse_unified_row(self, row, company_code):
+        """Parse unified payments CSV row - only include Paid/Refunded transactions"""
+        try:
+            # Check status first - only include Paid or Refunded
+            status_raw = row.get('Status', '').strip().lower()
+            if status_raw not in ['paid', 'refunded']:
+                return None
+
+            # Must have an ID (skip incomplete records)
+            tx_id = row.get('id', '').strip()
+            if not tx_id:
+                return None
+
+            # Parse created date
+            created_str = row.get('Created date (UTC)', '').strip()
+            created = None
+            if created_str:
+                try:
+                    created = datetime.strptime(created_str, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    try:
+                        created = datetime.strptime(created_str, '%Y-%m-%d %H:%M')
+                    except ValueError:
+                        pass
+
+            if not created:
+                return None
+
+            # Use Converted Amount (HKD) as gross - this matches Stripe's balance reports
+            converted_currency = row.get('Converted Currency', '').strip().lower()
+            if converted_currency == 'hkd':
+                gross = self._parse_decimal(row.get('Converted Amount', '0'))
+            else:
+                # If not HKD, still use converted amount but log it
+                gross = self._parse_decimal(row.get('Converted Amount', '0'))
+
+            fee = self._parse_decimal(row.get('Fee', '0'))
+            net = gross - fee
+
+            # Handle refunds - check Amount Refunded and Converted Amount Refunded
+            amount_refunded = self._parse_decimal(row.get('Amount Refunded', '0'))
+            converted_refunded = self._parse_decimal(row.get('Converted Amount Refunded', '0'))
+            refunded_date_str = row.get('Refunded date (UTC)', '').strip()
+
+            # Determine party (customer email)
+            party = row.get('Customer Email', '').strip()
+            if not party or party == '':
+                party = self._extract_party_from_metadata(row) or 'N/A'
+
+            # Get description from metadata
+            description = self._build_description_from_metadata(row)
+
+            # Determine transaction type from ID prefix
+            if tx_id.startswith('ch_'):
+                tx_type = 'charge'
+            elif tx_id.startswith('py_'):
+                tx_type = 'payment'
+            elif tx_id.startswith('re_'):
+                tx_type = 'refund'
+            else:
+                tx_type = 'payment'
+
+            transactions = []
+
+            # Create the main charge/payment transaction
+            if gross > 0:
+                # Gross entry (debit - increases balance)
+                gross_tx = {
+                    'id': tx_id + '_gross',
+                    'stripe_id': tx_id,
+                    'date': created.date(),
+                    'nature': 'Charge' if tx_type == 'charge' else 'Payment',
+                    'party': party,
+                    'debit': float(gross),
+                    'credit': 0,
+                    'balance': 0,
+                    'acknowledged': False,
+                    'description': description,
+                    'gross': float(gross),
+                    'amount': float(gross),
+                    'fee': float(fee),
+                    'net_amount': float(net),
+                    'currency': 'HKD',
+                    'status': 'succeeded',
+                    'type': tx_type,
+                    'created': created,
+                    'available_on': created.date(),
+                    'transfer_date': (created + timedelta(days=6)).date(),  # Stripe ~6 days to payout
+                    'account_name': self.company_names.get(company_code, 'Unknown Company'),
+                    'company_code': company_code,
+                    'reporting_category': 'charge'
+                }
+                transactions.append(gross_tx)
+
+                # Fee entry (credit - decreases balance)
+                if fee > 0:
+                    fee_tx = {
+                        'id': tx_id + '_fee',
+                        'stripe_id': tx_id,
+                        'date': created.date(),
+                        'nature': 'Processing Fee',
+                        'party': 'Stripe',
+                        'debit': 0,
+                        'credit': float(fee),
+                        'balance': 0,
+                        'acknowledged': False,
+                        'description': f"Fee for {description}",
+                        'gross': 0,
+                        'amount': float(-fee),
+                        'fee': float(fee),
+                        'net_amount': float(-fee),
+                        'currency': 'HKD',
+                        'status': 'succeeded',
+                        'type': 'fee',
+                        'created': created,
+                        'available_on': created.date(),
+                        'transfer_date': (created + timedelta(days=6)).date(),
+                        'account_name': self.company_names.get(company_code, 'Unknown Company'),
+                        'company_code': company_code,
+                        'is_fee': True,
+                        'reporting_category': 'fee'
+                    }
+                    transactions.append(fee_tx)
+
+            # Handle refund if this payment was refunded
+            if converted_refunded > 0 and refunded_date_str:
+                refund_date = None
+                try:
+                    refund_date = datetime.strptime(refunded_date_str, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    try:
+                        refund_date = datetime.strptime(refunded_date_str, '%Y-%m-%d %H:%M')
+                    except ValueError:
+                        pass
+
+                if refund_date:
+                    # Refund reduces balance (negative gross, positive fee for refund processing)
+                    # Stripe charges a fee on refunds (typically same as original fee proportion)
+                    refund_fee = self._parse_decimal(row.get('Fee', '0'))  # Approximate refund fee
+
+                    # Refund gross entry (credit - decreases balance)
+                    refund_tx = {
+                        'id': tx_id + '_refund',
+                        'stripe_id': tx_id,
+                        'date': refund_date.date(),
+                        'nature': 'Refund',
+                        'party': party,
+                        'debit': 0,
+                        'credit': float(converted_refunded),
+                        'balance': 0,
+                        'acknowledged': False,
+                        'description': f"Refund for {description}",
+                        'gross': float(-converted_refunded),
+                        'amount': float(-converted_refunded),
+                        'fee': 0,
+                        'net_amount': float(-converted_refunded),
+                        'currency': 'HKD',
+                        'status': 'refunded',
+                        'type': 'refund',
+                        'created': refund_date,
+                        'available_on': refund_date.date(),
+                        'transfer_date': (refund_date + timedelta(days=2)).date(),
+                        'account_name': self.company_names.get(company_code, 'Unknown Company'),
+                        'company_code': company_code,
+                        'reporting_category': 'refund'
+                    }
+                    transactions.append(refund_tx)
+
+            return transactions if transactions else None
+
+        except Exception as e:
+            self.logger.error(f"Error parsing unified row: {e}")
+            return None
+
+    def _build_description_from_metadata(self, row):
+        """Build description from metadata fields"""
+        parts = []
+
+        # Product name
+        product = row.get('4. Product name (metadata)', '').strip()
+        if product:
+            parts.append(product)
+
+        # Site
+        site = row.get('1. Site (metadata)', '').strip() or row.get('site (metadata)', '').strip()
+        if site and site not in parts:
+            parts.append(site)
+
+        # Type (subscription, donation, etc.)
+        tx_type = row.get('webhook_event_type (metadata)', '').strip() or row.get('type (metadata)', '').strip()
+        if tx_type:
+            parts.append(tx_type)
+
+        if parts:
+            return ' - '.join(parts)
+        else:
+            return row.get('Description', '').strip() or 'Payment'
     
     def _read_csv_file(self, csv_file, company_code):
         """Read and parse a single CSV file"""
@@ -473,11 +743,28 @@ class CompleteCsvService:
     
     def generate_monthly_statement(self, year, month, company_filter=None, previous_balance=None, use_transfer_dates=False):
         """Generate monthly statement with running balance"""
-        
+
         # If use_transfer_dates is True, generate payout reconciliation instead
         if use_transfer_dates:
             return self.generate_payout_reconciliation(year, month, company_filter)
-        
+
+        # Try to use Stripe report files first (most accurate)
+        stripe_statement = self.generate_monthly_statement_from_stripe_reports(year, month, company_filter)
+        if stripe_statement and 'error' not in stripe_statement:
+            # Convert to old format for backward compatibility
+            return {
+                'transactions': stripe_statement.get('transactions', []),
+                'opening_balance': stripe_statement['summary']['opening_balance'],
+                'closing_balance': stripe_statement['summary']['closing_balance'],
+                'month': month,
+                'year': year,
+                'company_filter': company_filter,
+                'total_debit': stripe_statement['statistics']['charge_gross'],
+                'total_credit': abs(stripe_statement['statistics']['payout_total']) + abs(stripe_statement['statistics']['refund_gross']),
+                'source': 'stripe_reports'
+            }
+
+        # Fall back to calculating from unified file
         # If previous_balance is not provided, get it from the previous month
         if previous_balance is None:
             previous_balance = self._get_previous_month_closing_balance(year, month, company_filter)
@@ -538,7 +825,1043 @@ class CompleteCsvService:
             'total_debit': sum(tx['debit'] for tx in monthly_transactions),
             'total_credit': sum(tx['credit'] for tx in monthly_transactions)
         }
-    
+
+    def generate_balance_summary(self, year, month, company_filter=None, start_day=1, end_day=None, starting_balance=None):
+        """
+        Generate Balance Summary matching Stripe's Balance Summary report format.
+
+        This produces output consistent with:
+        - cgge_Balance_Summary_HKD_2025-11-01_to_2025-11-29_UTC.csv
+
+        Args:
+            year: The year
+            month: The month
+            company_filter: Company code to filter by (e.g., 'cgge')
+            start_day: Start day of month (default 1)
+            end_day: End day of month (default last day of month)
+            starting_balance: Optional known starting balance (if None, tries to calculate or read from previous month)
+        """
+        # Determine date range
+        start_date = datetime(year, month, start_day).date()
+        if end_day is None:
+            if month == 12:
+                end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            else:
+                end_date = datetime(year, month + 1, 1).date() - timedelta(days=1)
+        else:
+            end_date = datetime(year, month, end_day).date()
+
+        # Get starting balance
+        if starting_balance is not None:
+            starting_balance = Decimal(str(starting_balance))
+        else:
+            # Try to get from previous month's Balance Summary file
+            prev_month = month - 1
+            prev_year = year
+            if prev_month == 0:
+                prev_month = 12
+                prev_year = year - 1
+            prev_summary = self._read_stripe_balance_summary(prev_year, prev_month, company_filter)
+            if prev_summary and 'ending_balance' in prev_summary:
+                starting_balance = Decimal(str(prev_summary['ending_balance']))
+            else:
+                # Fall back to calculating from transactions
+                starting_balance = Decimal(str(self._get_previous_month_closing_balance(year, month, company_filter)))
+
+        # Get all transactions
+        all_transactions = self.import_transactions_from_csv()
+
+        # Filter transactions for the period
+        activity_gross = Decimal('0')
+        activity_fee = Decimal('0')
+        refund_gross = Decimal('0')
+        refund_fee = Decimal('0')
+        charge_count = 0
+        refund_count = 0
+
+        for tx in all_transactions:
+            if company_filter and tx.get('company_code') != company_filter:
+                continue
+
+            tx_date = tx.get('date')
+            if not tx_date or tx_date < start_date or tx_date > end_date:
+                continue
+
+            tx_type = tx.get('type', '')
+            reporting_cat = tx.get('reporting_category', '')
+
+            # Charges/Payments contribute to activity_gross
+            if tx_type in ['charge', 'payment'] and not tx.get('is_fee'):
+                activity_gross += Decimal(str(tx.get('debit', 0)))
+                charge_count += 1
+            # Fees reduce the activity
+            elif tx_type == 'fee' or tx.get('is_fee'):
+                activity_fee += Decimal(str(tx.get('credit', 0)))
+            # Refunds are negative activity
+            elif tx_type == 'refund':
+                refund_gross += Decimal(str(tx.get('credit', 0)))
+                refund_count += 1
+
+        # Calculate activity net (gross - fees - refunds)
+        # Note: In Stripe's Balance Summary format:
+        # - activity_gross = charges gross - refund gross (refunds reduce the gross figure)
+        # - activity_fee = total fees (shown as negative)
+        # - activity_net = activity_gross + activity_fee
+        total_gross = activity_gross - refund_gross  # Stripe shows this as "activity_gross"
+        activity_net = total_gross - activity_fee  # This is the net activity
+
+        # Try to read payouts from Stripe's Itemised Payouts file
+        payouts_data = self._read_stripe_itemised_payouts(year, month, company_filter, start_date, end_date)
+        payouts_gross = Decimal(str(payouts_data.get('gross', 0)))
+        payouts_fee = Decimal(str(payouts_data.get('fee', 0)))
+        payouts_net = payouts_gross - payouts_fee
+
+        # Calculate ending balance: starting + activity - payouts
+        ending_balance = Decimal(str(starting_balance)) + activity_net - payouts_net
+
+        # For accurate results, read from the Stripe Balance Summary if available
+        stripe_balance_summary = self._read_stripe_balance_summary(year, month, company_filter)
+        if stripe_balance_summary:
+            return stripe_balance_summary
+
+        # Otherwise, calculate from transactions
+        # Note: Stripe's activity_gross = charges - refunds (total_gross includes refunds already)
+        return {
+            'period': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'year': year,
+                'month': month
+            },
+            'company': company_filter,
+            'currency': 'hkd',
+            'starting_balance': float(starting_balance),
+            'activity': {
+                'gross': float(total_gross),  # Stripe format: charges - refunds
+                'fee': float(-activity_fee),
+                'net': float(activity_net),
+                'charge_count': charge_count,
+                'refund_count': refund_count,
+                'detail': {
+                    'charges_gross': float(activity_gross),
+                    'refunds_gross': float(-refund_gross)
+                }
+            },
+            'payouts': {
+                'gross': float(-payouts_gross),  # Negative because money leaves balance
+                'fee': float(payouts_fee),
+                'net': float(-payouts_net)  # Negative because money leaves balance
+            },
+            'ending_balance': float(ending_balance),
+            'reconciliation': {
+                'calculated_ending': float(Decimal(str(starting_balance)) + activity_net - (payouts_gross - payouts_fee)),
+                'formula': 'starting_balance + activity_net - payouts_net'
+            },
+            'source': 'calculated'
+        }
+
+    def _build_party_lookup_from_unified(self, company_filter, year, month):
+        """
+        Build a lookup table from unified payments CSV to get party names.
+        Returns a dict mapping (date, amount) -> party_info
+        """
+        lookup = {}
+
+        # Find the unified file for this company
+        pattern = f"{company_filter}_unified_*.csv"
+        search_path = os.path.join(self.root_directory, pattern)
+        files = glob.glob(search_path)
+
+        if not files:
+            self.logger.info(f"No unified file found for {company_filter}")
+            return lookup
+
+        # Use the most recent unified file
+        unified_file = sorted(files)[-1]
+        self.logger.info(f"Building party lookup from {unified_file}")
+
+        try:
+            with open(unified_file, 'r', newline='', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+
+                for row in reader:
+                    # Parse date
+                    created_str = row.get('Created date (UTC)', '').strip()
+                    if not created_str:
+                        continue
+
+                    try:
+                        created = datetime.strptime(created_str, '%Y-%m-%d %H:%M:%S')
+                    except ValueError:
+                        try:
+                            created = datetime.strptime(created_str, '%Y-%m-%d %H:%M')
+                        except ValueError:
+                            continue
+
+                    # Only include transactions from the target month
+                    if created.year != year or created.month != month:
+                        continue
+
+                    # Get amount - use Converted Amount (HKD) for matching with Stripe reports
+                    amount_str = row.get('Converted Amount', '').strip()
+                    if not amount_str:
+                        amount_str = row.get('Amount', '0').strip()
+                    try:
+                        amount = float(amount_str) if amount_str else 0
+                    except ValueError:
+                        amount = 0
+
+                    # Skip non-successful payments
+                    status = row.get('Status', '').strip().lower()
+                    if status not in ['paid', 'succeeded', 'captured']:
+                        continue
+
+                    # Get party info
+                    party_name = row.get('3. User name (metadata)', '').strip()
+                    if not party_name or party_name == 'Not provided':
+                        party_name = row.get('Customer Email', '').strip()
+                    if not party_name:
+                        party_name = row.get('Customer Description', '').strip()
+
+                    product_name = row.get('4. Product name (metadata)', '').strip()
+                    customer_email = row.get('Customer Email', '').strip()
+
+                    # If no party name, use product as description
+                    if not party_name and product_name:
+                        party_name = product_name[:30]
+
+                    # Create lookup key based on date and amount
+                    date_key = created.date()
+
+                    # Get additional fields for Sales Transaction Details
+                    site_service = row.get('1. Site (metadata)', '').strip()
+                    if not site_service:
+                        site_service = row.get('site (metadata)', '').strip()
+
+                    # Get subscription plan info
+                    subs_type = row.get('subs_type (metadata)', '').strip()
+                    plan_days = row.get('plan_days (metadata)', '').strip()
+                    subscription_plan = subs_type
+                    if plan_days:
+                        subscription_plan = f"{subs_type} ({plan_days} days)" if subs_type else f"({plan_days} days)"
+
+                    # Get active and expiry dates
+                    active_date = row.get('4. Active date (metadata)', '').strip()
+                    if not active_date:
+                        active_date = row.get('3. Active date (metadata)', '').strip()
+                    expiry_date = row.get('5. Expiry date (metadata)', '').strip()
+                    if not expiry_date:
+                        expiry_date = row.get('4. Expiry date (metadata)', '').strip()
+
+                    # Get original amount and currency
+                    original_amount = row.get('Amount', '').strip()
+                    original_currency = row.get('Currency', '').strip().upper()
+
+                    # Get fee
+                    fee_str = row.get('Fee', '0').strip()
+                    try:
+                        fee = float(fee_str) if fee_str else 0
+                    except ValueError:
+                        fee = 0
+
+                    # Store in lookup with multiple possible keys
+                    lookup_key = (date_key, amount)
+                    lookup[lookup_key] = {
+                        'party_name': party_name if party_name else 'Customer',
+                        'product': product_name,
+                        'email': customer_email,
+                        'payment_id': row.get('id', ''),
+                        'customer_id': row.get('Customer ID', '').strip(),
+                        'user_name': row.get('3. User name (metadata)', '').strip(),
+                        'site_service': site_service,
+                        'subscription_plan': subscription_plan,
+                        'active_date': active_date,
+                        'expiry_date': expiry_date if expiry_date else 'N/A',
+                        'original_amount': original_amount,
+                        'original_currency': original_currency,
+                        'converted_amount': amount,
+                        'processing_fee': fee,
+                        'transaction_id': row.get('id', ''),
+                        'created_date': created_str
+                    }
+
+                    # Also store with rounded amounts for matching
+                    lookup[(date_key, round(amount, 2))] = lookup[lookup_key]
+
+        except Exception as e:
+            self.logger.error(f"Error building party lookup: {e}")
+
+        self.logger.info(f"Built party lookup with {len(lookup)} entries")
+        return lookup
+
+    def generate_monthly_statement_from_stripe_reports(self, year, month, company_filter, start_day=1, end_day=None):
+        """
+        Generate a complete monthly statement using the 3 Stripe report CSV files:
+        1. Balance Summary - for opening/closing balances and totals
+        2. Itemised Balance Change from Activity - for transaction details
+        3. Itemised Payouts - for payout details
+
+        If the Stripe report doesn't cover the full month (e.g., ends on Nov 29),
+        this method will supplement with data from the unified file.
+
+        This is the authoritative source for monthly statements.
+        """
+        # Determine date range
+        start_date = datetime(year, month, start_day).date()
+        if end_day is None:
+            if month == 12:
+                end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            else:
+                end_date = datetime(year, month + 1, 1).date() - timedelta(days=1)
+        else:
+            end_date = datetime(year, month, end_day).date()
+
+        # Read Balance Summary
+        balance_summary = self._read_stripe_balance_summary(year, month, company_filter)
+        if not balance_summary:
+            return {'error': f'Balance Summary file not found for {company_filter} {year}-{month:02d}'}
+
+        # Check if Stripe report covers the full requested period
+        stripe_end_date_str = balance_summary.get('period', {}).get('end_date', '')
+        stripe_end_date = None
+        if stripe_end_date_str:
+            try:
+                stripe_end_date = datetime.strptime(stripe_end_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+        # If Stripe report ends before our requested end_date, supplement with unified file
+        supplement_transactions = []
+        supplement_activity_gross = Decimal('0')
+        supplement_activity_fee = Decimal('0')
+        supplement_activity_net = Decimal('0')
+
+        if stripe_end_date and stripe_end_date < end_date:
+            self.logger.info(f"Stripe report ends on {stripe_end_date}, supplementing with unified file data until {end_date}")
+            # Get transactions from unified file for the gap period
+            all_transactions = self.import_transactions_from_csv()
+            for tx in all_transactions:
+                if company_filter and tx.get('company_code') != company_filter:
+                    continue
+                tx_date = tx.get('date')
+                if tx_date and stripe_end_date < tx_date <= end_date:
+                    supplement_transactions.append(tx)
+                    tx_type = tx.get('type', '')
+                    if tx_type in ['charge', 'payment'] and not tx.get('is_fee'):
+                        supplement_activity_gross += Decimal(str(tx.get('debit', 0)))
+                    elif tx_type == 'fee' or tx.get('is_fee'):
+                        supplement_activity_fee += Decimal(str(tx.get('credit', 0)))
+                    elif tx_type == 'refund':
+                        supplement_activity_gross -= Decimal(str(tx.get('credit', 0)))
+
+            supplement_activity_net = supplement_activity_gross - supplement_activity_fee
+
+        # Read Itemised Activity
+        activity_transactions = self._read_stripe_itemised_activity(year, month, company_filter, start_date, end_date)
+
+        # Read Itemised Payouts
+        payout_transactions = self._read_stripe_itemised_payouts_detail(year, month, company_filter, start_date, end_date)
+
+        # Build party lookup from unified CSV
+        party_lookup = self._build_party_lookup_from_unified(company_filter, year, month)
+
+        # Build complete statement
+        opening_balance = Decimal(str(balance_summary.get('starting_balance', 0)))
+
+        # Create transaction list with running balance
+        all_transactions = []
+        running_balance = opening_balance
+
+        # Add opening balance entry (per sample: Nature="Opening Balance", Party="Brought Forward", Credit=amount)
+        all_transactions.append({
+            'date': start_date,
+            'type': 'opening_balance',
+            'nature': 'Opening Balance',
+            'party': 'Brought Forward',
+            'description': f'Opening balance for {start_date.strftime("%B %Y")}',
+            'gross': 0,
+            'fee': 0,
+            'net': 0,
+            'debit': 0,
+            'credit': float(opening_balance) if opening_balance >= 0 else 0,
+            'balance': float(running_balance),
+            'acknowledged': 'Yes',
+            'category': 'balance'
+        })
+
+        # Combine activity and payout transactions, sort by date
+        combined = []
+
+        for tx in activity_transactions:
+            # Look up party info from unified file
+            tx_date = tx['created'].date() if tx['created'] else None
+            gross = tx.get('gross', 0)
+            party_info = party_lookup.get((tx_date, gross)) or party_lookup.get((tx_date, round(gross, 2)))
+
+            party_name = 'Customer'
+            if party_info:
+                party_name = party_info.get('party_name', 'Customer')
+
+            # Determine nature based on category
+            category = tx.get('reporting_category', '')
+            gross_val = float(tx.get('gross', 0))
+            fee_val = float(tx.get('fee', 0))
+
+            # Determine product description
+            product_desc = 'Gross'
+            if party_info and party_info.get('product'):
+                product_desc = party_info['product']
+
+            # Per sample format: Split each transaction into Gross row and Fee row
+            if category == 'charge':
+                # Row 1: Gross Charge (Debit = gross amount)
+                combined.append({
+                    'date': tx['created'],
+                    'sort_key': (tx['created'], 0),  # Gross first
+                    'party': party_name,
+                    'nature': 'Gross Charge',
+                    'description': product_desc,
+                    'debit': gross_val if gross_val > 0 else 0,
+                    'credit': 0,
+                    'gross': gross_val,
+                    'fee': 0,
+                    'net': gross_val,  # Gross row adds the full gross
+                    'balance_transaction_id': tx.get('balance_transaction_id'),
+                    'created': tx['created'],
+                    'currency': tx.get('currency', 'HKD'),
+                    'reporting_category': 'charge',
+                    'acknowledged': 'No',
+                    'type': 'activity'
+                })
+                # Row 2: Processing Fee (Credit = fee amount)
+                if fee_val > 0:
+                    combined.append({
+                        'date': tx['created'],
+                        'sort_key': (tx['created'], 1),  # Fee after gross
+                        'party': 'Stripe',
+                        'nature': 'Processing Fee',
+                        'description': f'Processing fee for',
+                        'debit': 0,
+                        'credit': fee_val,
+                        'gross': 0,
+                        'fee': fee_val,
+                        'net': -fee_val,  # Fee row subtracts the fee
+                        'balance_transaction_id': tx.get('balance_transaction_id'),
+                        'created': tx['created'],
+                        'currency': tx.get('currency', 'HKD'),
+                        'reporting_category': 'fee',
+                        'acknowledged': 'No',
+                        'type': 'activity'
+                    })
+            elif category == 'refund':
+                # Refund: Credit = refund amount (money going out)
+                combined.append({
+                    'date': tx['created'],
+                    'sort_key': (tx['created'], 0),
+                    'party': party_name,
+                    'nature': 'Refund',
+                    'description': 'Refund',
+                    'debit': 0,
+                    'credit': abs(gross_val),
+                    'gross': gross_val,
+                    'fee': fee_val,
+                    'net': tx.get('net', gross_val + fee_val),
+                    'balance_transaction_id': tx.get('balance_transaction_id'),
+                    'created': tx['created'],
+                    'currency': tx.get('currency', 'HKD'),
+                    'reporting_category': 'refund',
+                    'acknowledged': 'No',
+                    'type': 'activity'
+                })
+            else:
+                # Other activity types
+                nature = category.title() if category else 'Activity'
+                combined.append({
+                    'date': tx['created'],
+                    'sort_key': (tx['created'], 0),
+                    'party': party_name,
+                    'nature': nature,
+                    'description': tx.get('description', '') or nature,
+                    'debit': gross_val if gross_val > 0 else 0,
+                    'credit': fee_val if fee_val > 0 else (abs(gross_val) if gross_val < 0 else 0),
+                    'gross': gross_val,
+                    'fee': fee_val,
+                    'net': tx.get('net', 0),
+                    'balance_transaction_id': tx.get('balance_transaction_id'),
+                    'created': tx['created'],
+                    'currency': tx.get('currency', 'HKD'),
+                    'reporting_category': category,
+                    'acknowledged': 'No',
+                    'type': 'activity'
+                })
+
+        for tx in payout_transactions:
+            # Payouts are money going out = Credit (per sample: Party="STRIPE PAYOUT", Nature="Payout")
+            gross_val = float(tx.get('gross', 0))
+            combined.append({
+                'date': tx['effective_at'],
+                'sort_key': (tx['effective_at'], 2),  # Payouts after activity on same date
+                'party': 'STRIPE PAYOUT',
+                'nature': 'Payout',
+                'description': 'STRIPE PAYOUT',
+                'debit': 0,
+                'credit': abs(gross_val),
+                'gross': gross_val,
+                'fee': tx.get('fee', 0),
+                'net': tx.get('net', gross_val),
+                'balance_transaction_id': tx.get('balance_transaction_id'),
+                'created': tx.get('effective_at'),
+                'currency': tx.get('currency', 'HKD'),
+                'reporting_category': 'payout',
+                'acknowledged': 'No',
+                'type': 'payout'
+            })
+
+        # Add supplement transactions (from unified file for dates not covered by Stripe report)
+        # Per sample format: Split into Gross Charge and Processing Fee rows
+        for tx in supplement_transactions:
+            tx_date = tx.get('date')
+            if tx_date:
+                tx_type = tx.get('type', 'charge')
+                is_fee = tx.get('is_fee', False)
+                gross_val = tx.get('debit', 0) if not is_fee else 0
+                fee_val = tx.get('credit', 0) if is_fee else 0
+                customer_name = tx.get('customer_name', 'Customer')
+                description = tx.get('description', '')
+
+                tx_datetime = datetime.combine(tx_date, datetime.min.time())
+
+                if is_fee:
+                    # This is a fee row
+                    combined.append({
+                        'date': tx_datetime,
+                        'sort_key': (tx_datetime, 1),  # Fee after gross
+                        'party': 'Stripe',
+                        'nature': 'Processing Fee',
+                        'description': f'Processing fee for',
+                        'debit': 0,
+                        'credit': fee_val,
+                        'gross': 0,
+                        'fee': fee_val,
+                        'net': -fee_val,
+                        'balance_transaction_id': tx.get('id', ''),
+                        'created': tx_datetime,
+                        'currency': 'HKD',
+                        'reporting_category': 'fee',
+                        'acknowledged': 'No',
+                        'type': 'activity',
+                        'source': 'unified_file'
+                    })
+                else:
+                    # This is a gross charge row
+                    combined.append({
+                        'date': tx_datetime,
+                        'sort_key': (tx_datetime, 0),  # Gross first
+                        'party': customer_name,
+                        'nature': 'Gross Charge',
+                        'description': description or 'Gross',
+                        'debit': gross_val if gross_val > 0 else 0,
+                        'credit': 0,
+                        'gross': gross_val,
+                        'fee': 0,
+                        'net': gross_val,
+                        'balance_transaction_id': tx.get('id', ''),
+                        'created': tx_datetime,
+                        'currency': 'HKD',
+                        'reporting_category': 'charge',
+                        'acknowledged': 'No',
+                        'type': 'activity',
+                        'source': 'unified_file'
+                    })
+
+        # Sort by date
+        combined.sort(key=lambda x: x['sort_key'])
+
+        # Calculate running balance
+        for tx in combined:
+            net = Decimal(str(tx.get('net', 0)))
+            running_balance += net
+            tx['balance'] = float(running_balance)
+            all_transactions.append(tx)
+
+        # Calculate SUBTOTAL of all debits and credits
+        total_debit = sum(float(tx.get('debit', 0)) for tx in combined)
+        total_credit = sum(float(tx.get('credit', 0)) for tx in combined)
+
+        # Add SUBTOTAL row (per sample format)
+        all_transactions.append({
+            'date': end_date,
+            'type': 'subtotal',
+            'nature': 'SUBTOTAL',
+            'party': '',
+            'description': '',
+            'debit': total_debit,
+            'credit': total_credit,
+            'gross': 0,
+            'fee': 0,
+            'net': 0,
+            'balance': 0,
+            'acknowledged': '',
+            'category': 'subtotal'
+        })
+
+        # Add closing balance entry (per sample: Nature="Closing Balance", Party="Carry Forward", Credit=amount)
+        # Use Stripe's ending balance + any supplement activity
+        stripe_ending_balance = Decimal(str(balance_summary.get('ending_balance', 0)))
+        closing_balance = stripe_ending_balance + supplement_activity_net
+        all_transactions.append({
+            'date': end_date,
+            'type': 'closing_balance',
+            'nature': 'Closing Balance',
+            'party': 'Carry Forward',
+            'description': f'Closing balance for {end_date.strftime("%B %Y")}',
+            'gross': 0,
+            'fee': 0,
+            'net': 0,
+            'debit': 0,
+            'credit': float(closing_balance) if closing_balance >= 0 else 0,
+            'balance': float(closing_balance),
+            'acknowledged': 'Yes',
+            'category': 'balance'
+        })
+
+        # Summary statistics
+        charges = [tx for tx in activity_transactions if tx.get('reporting_category') == 'charge']
+        refunds = [tx for tx in activity_transactions if tx.get('reporting_category') == 'refund']
+
+        # Include supplement in activity totals
+        total_activity_gross = Decimal(str(balance_summary.get('activity', {}).get('gross', 0))) + supplement_activity_gross
+        total_activity_fee = Decimal(str(balance_summary.get('activity', {}).get('fee', 0))) - supplement_activity_fee  # fee is negative
+        total_activity_net = Decimal(str(balance_summary.get('activity', {}).get('net', 0))) + supplement_activity_net
+
+        # Count supplement charges
+        supplement_charges = [tx for tx in supplement_transactions if tx.get('type') in ['charge', 'payment'] and not tx.get('is_fee')]
+
+        # Build Sales Transaction Details from party_lookup (only Gross Charge transactions)
+        sales_details = []
+        sale_number = 0
+        for tx in all_transactions:
+            if tx.get('nature') == 'Gross Charge' and tx.get('type') != 'subtotal':
+                tx_date = tx.get('created') or tx.get('date')
+                gross_amount = float(tx.get('gross', 0))
+
+                # Try to get date_key for lookup
+                date_key = None
+                if tx_date:
+                    if hasattr(tx_date, 'date'):
+                        date_key = tx_date.date()
+                    elif isinstance(tx_date, str):
+                        # Handle various date string formats
+                        from datetime import datetime as dt
+                        try:
+                            if 'T' in tx_date:
+                                # ISO format with T: "2025-11-02T12:00:00Z"
+                                date_key = dt.fromisoformat(tx_date.replace('Z', '+00:00')).date()
+                            elif tx_date[:4].isdigit():
+                                # ISO format: "2025-11-02"
+                                date_key = dt.strptime(tx_date[:10], '%Y-%m-%d').date()
+                            elif ',' in tx_date:
+                                # HTTP date format: "Sun, 02 Nov 2025 03:19:33 GMT"
+                                date_key = dt.strptime(tx_date, '%a, %d %b %Y %H:%M:%S %Z').date()
+                            else:
+                                date_key = None
+                        except:
+                            date_key = None
+                    else:
+                        date_key = tx_date
+
+                # Look up party info
+                party_info = None
+                if date_key:
+                    party_info = party_lookup.get((date_key, gross_amount)) or party_lookup.get((date_key, round(gross_amount, 2)))
+
+                # Always add a sale entry, using party_info if available, else use tx data
+                sale_number += 1
+                if date_key and hasattr(date_key, 'strftime'):
+                    sale_date = date_key.strftime('%Y-%m-%d')
+                elif tx_date and hasattr(tx_date, 'strftime'):
+                    sale_date = tx_date.strftime('%Y-%m-%d')
+                else:
+                    sale_date = str(tx_date)[:10] if tx_date else ''
+
+                if party_info:
+                    sales_details.append({
+                        'sale_number': sale_number,
+                        'date': sale_date,
+                        'amount': gross_amount,
+                        'customer_email': party_info.get('email', ''),
+                        'user_name': party_info.get('user_name', party_info.get('party_name', '')),
+                        'site_service': party_info.get('site_service', ''),
+                        'subscription_plan': party_info.get('subscription_plan', ''),
+                        'active_date': party_info.get('active_date', sale_date),
+                        'expiry_date': party_info.get('expiry_date', 'N/A'),
+                        'original_amount': f"{party_info.get('original_amount', '')} {party_info.get('original_currency', '')}",
+                        'converted_amount': gross_amount,
+                        'processing_fee': party_info.get('processing_fee', 0),
+                        'customer_id': party_info.get('customer_id', ''),
+                        'transaction_id': party_info.get('transaction_id', '')
+                    })
+                else:
+                    # Use data from transaction itself
+                    sales_details.append({
+                        'sale_number': sale_number,
+                        'date': sale_date,
+                        'amount': gross_amount,
+                        'customer_email': tx.get('party', ''),
+                        'user_name': tx.get('party', ''),
+                        'site_service': '',
+                        'subscription_plan': '',
+                        'active_date': sale_date,
+                        'expiry_date': 'N/A',
+                        'original_amount': '',
+                        'converted_amount': gross_amount,
+                        'processing_fee': 0,
+                        'customer_id': '',
+                        'transaction_id': tx.get('balance_transaction_id', '')
+                    })
+
+        return {
+            'period': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'year': year,
+                'month': month,
+                'stripe_report_end_date': stripe_end_date.isoformat() if stripe_end_date else None
+            },
+            'company': company_filter,
+            'currency': 'HKD',
+            'summary': {
+                'opening_balance': float(opening_balance),
+                'activity': {
+                    'gross': float(total_activity_gross),
+                    'fee': float(total_activity_fee),
+                    'net': float(total_activity_net)
+                },
+                'payouts': {
+                    'gross': balance_summary.get('payouts', {}).get('gross', 0),
+                    'fee': balance_summary.get('payouts', {}).get('fee', 0),
+                    'net': balance_summary.get('payouts', {}).get('net', 0)
+                },
+                'closing_balance': float(closing_balance)
+            },
+            'statistics': {
+                'charge_count': len(charges) + len(supplement_charges),
+                'charge_gross': float(sum(Decimal(str(tx.get('gross', 0))) for tx in charges) + supplement_activity_gross),
+                'charge_fees': float(sum(Decimal(str(tx.get('fee', 0))) for tx in charges) + supplement_activity_fee),
+                'charge_net': float(sum(Decimal(str(tx.get('net', 0))) for tx in charges) + supplement_activity_net),
+                'refund_count': len(refunds),
+                'refund_gross': float(sum(Decimal(str(tx.get('gross', 0))) for tx in refunds)),
+                'refund_fees': float(sum(Decimal(str(tx.get('fee', 0))) for tx in refunds)),
+                'refund_net': float(sum(Decimal(str(tx.get('net', 0))) for tx in refunds)),
+                'payout_count': len(payout_transactions),
+                'payout_total': float(sum(Decimal(str(tx.get('net', 0))) for tx in payout_transactions)),
+                'supplement_transaction_count': len(supplement_transactions)
+            },
+            'transactions': all_transactions,
+            'activity_detail': activity_transactions,
+            'payout_detail': payout_transactions,
+            'supplement_detail': supplement_transactions if supplement_transactions else None,
+            'sales_details': sales_details,
+            'source': 'stripe_reports' + ('_with_supplement' if supplement_transactions else '')
+        }
+
+    def _read_stripe_itemised_activity(self, year, month, company_filter, start_date, end_date):
+        """Read itemised balance change from activity CSV file"""
+        # Look for files like: cgge_Itemised_balance_change_from_activity_HKD_2025-11-01_to_2025-11-29_UTC.csv
+        pattern = f"{company_filter}_Itemised_balance_change_from_activity_*.csv"
+        search_path = os.path.join(self.root_directory, pattern)
+        files = glob.glob(search_path)
+
+        if not files:
+            return []
+
+        # Find file matching the year/month
+        for file_path in files:
+            filename = os.path.basename(file_path)
+            if f"{year}-{month:02d}" in filename:
+                return self._parse_stripe_itemised_activity(file_path)
+
+        return []
+
+    def _parse_stripe_itemised_activity(self, file_path):
+        """Parse Stripe's Itemised Balance Change from Activity CSV format"""
+        transactions = []
+
+        try:
+            with open(file_path, 'r', newline='', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+
+                for row in reader:
+                    # Parse created date
+                    created_str = row.get('created', '').strip()
+                    created = None
+                    if created_str:
+                        try:
+                            created = datetime.strptime(created_str, '%Y-%m-%d %H:%M:%S')
+                        except ValueError:
+                            try:
+                                created = datetime.strptime(created_str, '%Y-%m-%d %H:%M')
+                            except ValueError:
+                                continue
+
+                    # Parse available_on date
+                    available_str = row.get('available_on', '').strip()
+                    available_on = None
+                    if available_str:
+                        try:
+                            available_on = datetime.strptime(available_str, '%Y-%m-%d %H:%M:%S')
+                        except ValueError:
+                            try:
+                                available_on = datetime.strptime(available_str, '%Y-%m-%d %H:%M')
+                            except ValueError:
+                                pass
+
+                    gross = self._parse_decimal(row.get('gross', '0'))
+                    fee = self._parse_decimal(row.get('fee', '0'))
+                    net = self._parse_decimal(row.get('net', '0'))
+                    category = row.get('reporting_category', '').strip()
+                    description = row.get('description', '').strip()
+
+                    transactions.append({
+                        'balance_transaction_id': row.get('balance_transaction_id', '').strip(),
+                        'created': created,
+                        'available_on': available_on,
+                        'currency': row.get('currency', 'hkd').strip().upper(),
+                        'gross': float(gross),
+                        'fee': float(fee),
+                        'net': float(net),
+                        'reporting_category': category,
+                        'description': description,
+                        'type': 'activity'
+                    })
+
+        except Exception as e:
+            self.logger.error(f"Error parsing Stripe Itemised Activity: {e}")
+
+        return transactions
+
+    def _read_stripe_itemised_payouts_detail(self, year, month, company_filter, start_date, end_date):
+        """Read itemised payouts CSV file with full details"""
+        pattern = f"{company_filter}_Itemised_payouts_*.csv"
+        search_path = os.path.join(self.root_directory, pattern)
+        files = glob.glob(search_path)
+
+        if not files:
+            return []
+
+        for file_path in files:
+            filename = os.path.basename(file_path)
+            if f"{year}-{month:02d}" in filename:
+                return self._parse_stripe_itemised_payouts_detail(file_path)
+
+        return []
+
+    def _parse_stripe_itemised_payouts_detail(self, file_path):
+        """Parse Stripe's Itemised Payouts CSV format with full details"""
+        payouts = []
+
+        try:
+            with open(file_path, 'r', newline='', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+
+                for row in reader:
+                    # Parse effective_at date
+                    effective_str = row.get('effective_at', '').strip()
+                    effective_at = None
+                    if effective_str:
+                        try:
+                            effective_at = datetime.strptime(effective_str, '%Y-%m-%d %H:%M:%S')
+                        except ValueError:
+                            try:
+                                effective_at = datetime.strptime(effective_str, '%Y-%m-%d %H:%M')
+                            except ValueError:
+                                continue
+
+                    # Parse arrival date
+                    arrival_str = row.get('payout_expected_arrival_date', '').strip()
+                    arrival_date = None
+                    if arrival_str:
+                        try:
+                            arrival_date = datetime.strptime(arrival_str, '%Y-%m-%d %H:%M:%S').date()
+                        except ValueError:
+                            try:
+                                arrival_date = datetime.strptime(arrival_str, '%Y-%m-%d').date()
+                            except ValueError:
+                                pass
+
+                    gross = self._parse_decimal(row.get('gross', '0'))
+                    fee = self._parse_decimal(row.get('fee', '0'))
+                    net = self._parse_decimal(row.get('net', '0'))
+
+                    payouts.append({
+                        'payout_id': row.get('payout_id', '').strip(),
+                        'balance_transaction_id': row.get('balance_transaction_id', '').strip(),
+                        'effective_at': effective_at,
+                        'arrival_date': arrival_date,
+                        'currency': row.get('currency', 'hkd').strip().upper(),
+                        'gross': float(-gross),  # Negative because money leaves balance
+                        'fee': float(fee),
+                        'net': float(-net),  # Negative because money leaves balance
+                        'status': row.get('payout_status', '').strip(),
+                        'description': row.get('description', '').strip(),
+                        'reporting_category': 'payout',
+                        'type': 'payout'
+                    })
+
+        except Exception as e:
+            self.logger.error(f"Error parsing Stripe Itemised Payouts: {e}")
+
+        return payouts
+
+    def _read_stripe_itemised_payouts(self, year, month, company_filter, start_date, end_date):
+        """Read payouts from Stripe's Itemised Payouts CSV file if available"""
+        # Look for files like: cgge_Itemised_payouts_HKD_2025-11-01_to_2025-11-29_UTC.csv
+        pattern = f"{company_filter}_Itemised_payouts_*.csv"
+        search_path = os.path.join(self.root_directory, pattern)
+        files = glob.glob(search_path)
+
+        if not files:
+            return {'gross': 0, 'fee': 0, 'count': 0}
+
+        # Find file matching the year/month
+        for file_path in files:
+            filename = os.path.basename(file_path)
+            if f"{year}-{month:02d}" in filename:
+                return self._parse_stripe_itemised_payouts(file_path, start_date, end_date)
+
+        return {'gross': 0, 'fee': 0, 'count': 0}
+
+    def _parse_stripe_itemised_payouts(self, file_path, start_date, end_date):
+        """Parse Stripe's Itemised Payouts CSV format"""
+        try:
+            total_gross = Decimal('0')
+            total_fee = Decimal('0')
+            count = 0
+
+            with open(file_path, 'r', newline='', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+
+                for row in reader:
+                    # Parse effective_at date
+                    effective_str = row.get('effective_at', '').strip()
+                    if not effective_str:
+                        continue
+
+                    try:
+                        effective_date = datetime.strptime(effective_str, '%Y-%m-%d %H:%M:%S').date()
+                    except ValueError:
+                        try:
+                            effective_date = datetime.strptime(effective_str, '%Y-%m-%d').date()
+                        except ValueError:
+                            continue
+
+                    # Check if within date range
+                    if effective_date < start_date or effective_date > end_date:
+                        continue
+
+                    gross = self._parse_decimal(row.get('gross', '0'))
+                    fee = self._parse_decimal(row.get('fee', '0'))
+
+                    total_gross += gross
+                    total_fee += fee
+                    count += 1
+
+            return {
+                'gross': float(total_gross),
+                'fee': float(total_fee),
+                'count': count
+            }
+
+        except Exception as e:
+            self.logger.error(f"Error parsing Stripe Itemised Payouts: {e}")
+            return {'gross': 0, 'fee': 0, 'count': 0}
+
+    def _read_stripe_balance_summary(self, year, month, company_filter):
+        """Read Balance Summary from Stripe's exported CSV file if available"""
+        # Look for files like: cgge_Balance_Summary_HKD_2025-11-01_to_2025-11-29_UTC.csv
+        pattern = f"{company_filter}_Balance_Summary_*.csv"
+        search_path = os.path.join(self.root_directory, pattern)
+        files = glob.glob(search_path)
+
+        if not files:
+            return None
+
+        # Find file matching the year/month
+        for file_path in files:
+            filename = os.path.basename(file_path)
+            # Extract date from filename
+            if f"{year}-{month:02d}" in filename:
+                return self._parse_stripe_balance_summary(file_path)
+
+        return None
+
+    def _parse_stripe_balance_summary(self, file_path):
+        """Parse Stripe's Balance Summary CSV format"""
+        try:
+            data = {}
+            with open(file_path, 'r', newline='', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+
+                for row in reader:
+                    category = row.get('category', '').strip()
+                    description = row.get('description', '').strip()
+                    net_amount = self._parse_decimal(row.get('net_amount', '0'))
+                    currency = row.get('currency', 'hkd').strip().lower()
+
+                    if category == 'starting_balance':
+                        data['starting_balance'] = float(net_amount)
+                    elif category == 'activity_gross':
+                        data['activity_gross'] = float(net_amount)
+                    elif category == 'activity_fee':
+                        data['activity_fee'] = float(net_amount)
+                    elif category == 'activity':
+                        data['activity_net'] = float(net_amount)
+                    elif category == 'payouts_gross':
+                        data['payouts_gross'] = float(net_amount)
+                    elif category == 'payouts_fee':
+                        data['payouts_fee'] = float(net_amount)
+                    elif category == 'payouts':
+                        data['payouts_net'] = float(net_amount)
+                    elif category == 'ending_balance':
+                        data['ending_balance'] = float(net_amount)
+
+                    data['currency'] = currency
+
+            # Extract date range from filename
+            filename = os.path.basename(file_path)
+            # Pattern: cgge_Balance_Summary_HKD_2025-11-01_to_2025-11-29_UTC.csv
+            import re
+            date_match = re.search(r'(\d{4}-\d{2}-\d{2})_to_(\d{4}-\d{2}-\d{2})', filename)
+            if date_match:
+                data['start_date'] = date_match.group(1)
+                data['end_date'] = date_match.group(2)
+
+            return {
+                'period': {
+                    'start_date': data.get('start_date', ''),
+                    'end_date': data.get('end_date', ''),
+                },
+                'currency': data.get('currency', 'hkd'),
+                'starting_balance': data.get('starting_balance', 0),
+                'activity': {
+                    'gross': data.get('activity_gross', 0),
+                    'fee': data.get('activity_fee', 0),
+                    'net': data.get('activity_net', 0)
+                },
+                'payouts': {
+                    'gross': data.get('payouts_gross', 0),
+                    'fee': data.get('payouts_fee', 0),
+                    'net': data.get('payouts_net', 0)
+                },
+                'ending_balance': data.get('ending_balance', 0),
+                'source': 'stripe_report',
+                'file': os.path.basename(file_path)
+            }
+
+        except Exception as e:
+            self.logger.error(f"Error parsing Stripe Balance Summary: {e}")
+            return None
+
     def generate_payout_reconciliation(self, year, month, company_filter=None):
         """Generate payout reconciliation based on transfer dates (matches Stripe's payout reconciliation)"""
         
@@ -764,11 +2087,14 @@ class CompleteCsvService:
         """Get list of companies from CSV files"""
         csv_files = self._find_csv_files()
         companies = set()
-        
-        for _, company_code in csv_files:
-            if company_code in self.company_names:
-                companies.add((company_code, self.company_names[company_code]))
-        
+
+        for file_info in csv_files:
+            # Handle both 2-tuple and 3-tuple formats
+            if len(file_info) >= 2:
+                company_code = file_info[1]
+                if company_code in self.company_names:
+                    companies.add((company_code, self.company_names[company_code]))
+
         return [{'code': code, 'name': name} for code, name in sorted(companies)]
     
     def get_available_months(self):

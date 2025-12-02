@@ -4009,6 +4009,119 @@ def payout_reconciliation_api():
             'error': str(e),
             'timestamp': datetime.now().isoformat()
         }), 500
+
+@analytics_bp.route('/api/stripe-monthly-statement')
+def stripe_monthly_statement_api():
+    """
+    Generate complete monthly statement from Stripe report CSV files.
+
+    Uses the 3 Stripe report files as source of truth:
+    1. Balance Summary - opening/closing balances
+    2. Itemised Balance Change from Activity - transaction details
+    3. Itemised Payouts - payout details
+
+    Query params:
+        company: Company code (e.g., 'cgge')
+        year: Year (e.g., 2025)
+        month: Month (e.g., 11)
+        start_day: Optional start day (default 1)
+        end_day: Optional end day (default last day of month)
+    """
+    try:
+        from app.services.complete_csv_service import CompleteCsvService
+
+        company = request.args.get('company')
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)
+        start_day = request.args.get('start_day', type=int, default=1)
+        end_day = request.args.get('end_day', type=int, default=None)
+
+        if not all([company, year, month]):
+            return jsonify({
+                'success': False,
+                'error': 'Missing required parameters: company, year, month'
+            }), 400
+
+        logger.info(f"Generating monthly statement from Stripe reports for {company} {year}-{month:02d}")
+
+        service = CompleteCsvService()
+        statement = service.generate_monthly_statement_from_stripe_reports(year, month, company, start_day, end_day)
+
+        if 'error' in statement:
+            return jsonify({
+                'success': False,
+                'error': statement['error']
+            }), 404
+
+        return jsonify({
+            'success': True,
+            'statement': statement,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Monthly statement generation failed: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+@analytics_bp.route('/api/balance-summary')
+def balance_summary_api():
+    """
+    Generate Balance Summary matching Stripe's Balance Summary report format.
+
+    Query params:
+        company: Company code (e.g., 'cgge')
+        year: Year (e.g., 2025)
+        month: Month (e.g., 11)
+        start_day: Optional start day (default 1)
+        end_day: Optional end day (default last day of month)
+
+    Returns JSON matching Stripe's Balance Summary format:
+    {
+        "starting_balance": 367.38,
+        "activity": {"gross": 14674.41, "fee": -799.46, "net": 13874.95},
+        "payouts": {"gross": -8356.57, "fee": 0.00, "net": -8356.57},
+        "ending_balance": 5885.76
+    }
+    """
+    try:
+        from app.services.complete_csv_service import CompleteCsvService
+
+        company = request.args.get('company')
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)
+        start_day = request.args.get('start_day', type=int, default=1)
+        end_day = request.args.get('end_day', type=int, default=None)
+        starting_balance = request.args.get('starting_balance', type=float, default=None)
+
+        if not all([company, year, month]):
+            return jsonify({
+                'success': False,
+                'error': 'Missing required parameters: company, year, month'
+            }), 400
+
+        logger.info(f"Generating balance summary for {company} {year}-{month:02d}")
+
+        service = CompleteCsvService()
+        summary = service.generate_balance_summary(year, month, company, start_day, end_day, starting_balance)
+
+        return jsonify({
+            'success': True,
+            'balance_summary': summary,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Balance summary generation failed: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 # Web Interface Routes for Monthly Statement and Payout Reconciliation
 
 @analytics_bp.route('/monthly-statement')
@@ -4174,8 +4287,9 @@ def monthly_statement_interface():
             <div class="header">
                 <h1>📄 Monthly Statement Generator</h1>
                 <p>Generate consolidated monthly statements with running balance</p>
+                <a href="csv-upload" class="upload-csv-link" style="display: inline-block; margin-top: 10px; padding: 8px 16px; background: #059669; color: white; text-decoration: none; border-radius: 6px; font-size: 0.9rem;">📤 Upload CSV Files</a>
             </div>
-            
+
             <div class="controls">
                 <div class="form-group">
                     <label for="company">Company</label>
@@ -4231,7 +4345,9 @@ def monthly_statement_interface():
                 document.getElementById('actionButtons').style.display = 'none';
                 
                 try {
-                    const response = await fetch(`/analytics/api/monthly-statement?company=${company}&year=${year}&month=${month}`);
+                    // Get base path for API calls (handles nginx proxy at /stripe/)
+                    const basePath = window.location.pathname.split('/analytics/')[0];
+                    const response = await fetch(`${basePath}/analytics/api/stripe-monthly-statement?company=${company}&year=${year}&month=${month}`);
                     const data = await response.json();
                     
                     if (data.success) {
@@ -4249,20 +4365,27 @@ def monthly_statement_interface():
             function displayStatement(statement) {
                 const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
                                  'July', 'August', 'September', 'October', 'November', 'December'];
-                
-                const companyName = statement.company_filter === 'cgge' ? 'cgge' : 
-                                  statement.company_filter === 'ki' ? 'Krystal Institute' :
-                                  statement.company_filter === 'kt' ? 'Krystal Technology' :
-                                  statement.company_filter || 'All Companies';
-                
+
+                // Handle both old and new response formats
+                const company = statement.company || statement.company_filter || '';
+                const year = (statement.period && statement.period.year) || statement.year || new Date().getFullYear();
+                const month = (statement.period && statement.period.month) || statement.month || new Date().getMonth() + 1;
+                const openingBalance = (statement.summary && statement.summary.opening_balance !== undefined) ? statement.summary.opening_balance : (statement.opening_balance || 0);
+                const closingBalance = (statement.summary && statement.summary.closing_balance !== undefined) ? statement.summary.closing_balance : (statement.closing_balance || 0);
+
+                const companyName = company === 'cgge' ? 'cgge' :
+                                  company === 'ki' ? 'Krystal Institute' :
+                                  company === 'kt' ? 'Krystal Technology' :
+                                  company || 'All Companies';
+
                 let html = `
                     <div class="statement-header">
-                        <h1>📄 Monthly Statement Generator</h1>
+                        <h1>Monthly Statement Generator</h1>
                         <p>Generate consolidated monthly statements with running balance</p>
                     </div>
-                    
+
                     <div class="statement-summary">
-                        <h3>Statement Summary for ${monthNames[statement.month]} ${statement.year}</h3>
+                        <h3>Statement Summary for ${monthNames[month]} ${year}</h3>
                         <div class="summary-grid">
                             <div class="summary-item">
                                 <span><strong>Company:</strong></span>
@@ -4270,11 +4393,11 @@ def monthly_statement_interface():
                             </div>
                             <div class="summary-item">
                                 <span><strong>Opening Balance:</strong></span>
-                                <span>HK$${statement.opening_balance.toFixed(2)}</span>
+                                <span>HK$${openingBalance.toFixed(2)}</span>
                             </div>
                             <div class="summary-item">
                                 <span><strong>Closing Balance:</strong></span>
-                                <span>HK$${statement.closing_balance.toFixed(2)}</span>
+                                <span>HK$${closingBalance.toFixed(2)}</span>
                             </div>
                             <div class="summary-item">
                                 <span><strong>Total Transactions:</strong></span>
@@ -4282,7 +4405,7 @@ def monthly_statement_interface():
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="statement-content">
                         <table class="statement-table">
                             <thead>
@@ -4298,78 +4421,180 @@ def monthly_statement_interface():
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="opening-balance">
-                                    <td>${statement.year}-${statement.month.toString().padStart(2, '0')}-01</td>
+                                <tr class="opening-balance" style="background-color: #fff3cd;">
+                                    <td>${year}-${month.toString().padStart(2, '0')}-01</td>
                                     <td>Opening Balance</td>
                                     <td>Brought Forward</td>
-                                    <td>${statement.opening_balance < 0 ? `HK$${Math.abs(statement.opening_balance).toFixed(2)}` : ''}</td>
-                                    <td>${statement.opening_balance >= 0 ? `HK$${Math.abs(statement.opening_balance).toFixed(2)}` : ''}</td>
-                                    <td>HK$${statement.opening_balance.toFixed(2)}</td>
+                                    <td></td>
+                                    <td>HK$${Math.abs(openingBalance).toFixed(2)}</td>
+                                    <td>HK$${openingBalance.toFixed(2)}</td>
                                     <td>Yes</td>
-                                    <td>Opening balance for ${monthNames[statement.month]} ${statement.year}</td>
+                                    <td>Opening balance for ${monthNames[month]} ${year}</td>
                                 </tr>
                 `;
                 
-                statement.transactions.forEach(tx => {
-                    const dateFormatted = new Date(tx.date).toISOString().split('T')[0];
-                    const debitDisplay = tx.debit > 0 ? `<span class="debit-amount">HK$${parseFloat(tx.debit).toFixed(2)}</span>` : '';
-                    const creditDisplay = tx.credit > 0 ? `<span class="credit-amount">HK$${parseFloat(tx.credit).toFixed(2)}</span>` : '';
+                // Filter out opening, closing balance, and subtotal entries (they are handled separately)
+                const txList = statement.transactions.filter(tx =>
+                    tx.type !== 'opening_balance' && tx.type !== 'closing_balance' && tx.type !== 'subtotal'
+                );
+
+                // Calculate running totals for subtotal
+                let totalDebit = 0;
+                let totalCredit = 0;
+
+                txList.forEach(tx => {
+                    const dateFormatted = tx.date ? new Date(tx.date).toISOString().split('T')[0] : '';
+                    const nature = tx.nature || tx.type || '';
+                    const party = tx.party || 'Customer';
+                    const debit = parseFloat(tx.debit || 0);
+                    const credit = parseFloat(tx.credit || 0);
+                    const balance = parseFloat(tx.balance || 0);
+                    const description = tx.description || tx.reporting_category || '';
+                    const acknowledged = tx.acknowledged || 'No';
+
+                    totalDebit += debit;
+                    totalCredit += credit;
+
+                    const debitDisplay = debit > 0 ? `<span class="debit-amount">HK$${debit.toFixed(2)}</span>` : '';
+                    const creditDisplay = credit > 0 ? `<span class="credit-amount">HK$${credit.toFixed(2)}</span>` : '';
+
                     html += `
                         <tr>
                             <td class="date-col">${dateFormatted}</td>
-                            <td class="nature-col">${tx.nature}</td>
-                            <td class="party-col">${tx.party}</td>
+                            <td class="nature-col">${nature}</td>
+                            <td class="party-col">${party}</td>
                             <td class="amount-col">${debitDisplay}</td>
                             <td class="amount-col">${creditDisplay}</td>
-                            <td class="balance-col">HK$${parseFloat(tx.balance).toFixed(2)}</td>
-                            <td class="ack-col">No</td>
-                            <td class="desc-col">${tx.description}</td>
+                            <td class="balance-col">HK$${balance.toFixed(2)}</td>
+                            <td class="ack-col">${acknowledged}</td>
+                            <td class="desc-col">${description}</td>
                         </tr>
                     `;
                 });
-                
-                // Add subtotal row
+
+                // Add subtotal row (per sample format - with orange background)
                 html += `
-                    <tr class="subtotal-row">
+                    <tr class="subtotal-row" style="background-color: #fff3cd; font-weight: bold;">
                         <td colspan="3"><strong>SUBTOTAL</strong></td>
-                        <td><strong><span class="debit-amount">HK$${statement.total_debit}</span></strong></td>
-                        <td><strong><span class="credit-amount">HK$${statement.total_credit}</span></strong></td>
+                        <td class="amount-col"><strong><span class="debit-amount">HK$${totalDebit.toFixed(2)}</span></strong></td>
+                        <td class="amount-col"><strong><span class="credit-amount">HK$${totalCredit.toFixed(2)}</span></strong></td>
                         <td colspan="3"></td>
                     </tr>
                 `;
                 
+                // Get last day of month
+                const lastDay = new Date(year, month, 0).getDate();
+                const closingDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+
                 html += `
-                                <tr class="closing-balance">
-                                    <td>${statement.year}-${statement.month.toString().padStart(2, '0')}-31</td>
+                                <tr class="closing-balance" style="background-color: #fff3cd;">
+                                    <td>${closingDate}</td>
                                     <td>Closing Balance</td>
                                     <td>Carry Forward</td>
-                                    <td>${statement.closing_balance < 0 ? `HK$${Math.abs(statement.closing_balance).toFixed(2)}` : ''}</td>
-                                    <td>${statement.closing_balance >= 0 ? `HK$${Math.abs(statement.closing_balance).toFixed(2)}` : ''}</td>
-                                    <td>HK$${statement.closing_balance.toFixed(2)}</td>
+                                    <td></td>
+                                    <td>${closingBalance >= 0 ? `HK$${Math.abs(closingBalance).toFixed(2)}` : ''}</td>
+                                    <td>HK$${closingBalance.toFixed(2)}</td>
                                     <td>Yes</td>
-                                    <td>Closing balance for ${monthNames[statement.month]} ${statement.year}</td>
+                                    <td>Closing balance for ${monthNames[month]} ${year}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 `;
-                
+
+                // Add Sales Transaction Details section
+                if (statement.sales_details && statement.sales_details.length > 0) {
+                    html += `
+                    <div class="sales-details-section" style="margin-top: 40px;">
+                        <h2 style="color: #1e40af; border-bottom: 2px solid #dc2626; padding-bottom: 10px; margin-bottom: 20px;">
+                            Sales Transaction Details
+                        </h2>
+                        <div class="sales-cards" style="display: flex; flex-wrap: wrap; gap: 20px;">
+                    `;
+
+                    statement.sales_details.forEach(sale => {
+                        html += `
+                        <div class="sale-card" style="flex: 1 1 45%; min-width: 400px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                            <div class="sale-header" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 600;">Sale #${sale.sale_number} - ${sale.date}</span>
+                                <span style="font-size: 1.2em; font-weight: bold;">HK$${sale.amount.toFixed(2)}</span>
+                            </div>
+                            <div class="sale-body" style="padding: 15px 20px;">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 8px 0; color: #6b7280; font-weight: 500;">Customer Email:</td>
+                                        <td style="padding: 8px 0; text-align: right;">${sale.customer_email || 'N/A'}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 8px 0; color: #6b7280; font-weight: 500;">User Name:</td>
+                                        <td style="padding: 8px 0; text-align: right;">${sale.user_name || 'N/A'}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 8px 0; color: #6b7280; font-weight: 500;">Site/Service:</td>
+                                        <td style="padding: 8px 0; text-align: right;">${sale.site_service || 'N/A'}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 8px 0; color: #6b7280; font-weight: 500;">Subscription Plan:</td>
+                                        <td style="padding: 8px 0; text-align: right;">${sale.subscription_plan || 'N/A'}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 8px 0; color: #6b7280; font-weight: 500;">Active Date:</td>
+                                        <td style="padding: 8px 0; text-align: right;">${sale.active_date || 'N/A'}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 8px 0; color: #6b7280; font-weight: 500;">Expiry Date:</td>
+                                        <td style="padding: 8px 0; text-align: right;">${sale.expiry_date || 'N/A'}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 8px 0; color: #6b7280; font-weight: 500;">Original Amount:</td>
+                                        <td style="padding: 8px 0; text-align: right;">${sale.original_amount || 'N/A'}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 8px 0; color: #6b7280; font-weight: 500;">Converted Amount:</td>
+                                        <td style="padding: 8px 0; text-align: right;">HK$${sale.converted_amount.toFixed(2)}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 8px 0; color: #6b7280; font-weight: 500;">Processing Fee:</td>
+                                        <td style="padding: 8px 0; text-align: right;">HK$${(sale.processing_fee || 0).toFixed(2)}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 8px 0; color: #6b7280; font-weight: 500;">Customer ID:</td>
+                                        <td style="padding: 8px 0; text-align: right; font-size: 0.85em;">${sale.customer_id || 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #6b7280; font-weight: 500;">Transaction ID:</td>
+                                        <td style="padding: 8px 0; text-align: right; font-size: 0.85em;">${sale.transaction_id || 'N/A'}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        `;
+                    });
+
+                    html += `
+                        </div>
+                    </div>
+                    `;
+                }
+
                 document.getElementById('results').innerHTML = html;
             }
-            
+
             function printStatement() {
                 window.print();
             }
             
             async function exportPDF() {
                 if (!currentStatement) return;
-                
+
                 try {
                     const company = document.getElementById('company').value;
                     const year = document.getElementById('year').value;
                     const month = document.getElementById('month').value;
-                    
-                    const response = await fetch(`/analytics/api/export-pdf?company=${company}&year=${year}&month=${month}`);
+
+                    // Get base path for API calls (handles nginx proxy at /stripe/)
+                    const basePath = window.location.pathname.split('/analytics/')[0];
+                    const response = await fetch(`${basePath}/analytics/api/export-pdf?company=${company}&year=${year}&month=${month}`);
                     
                     if (response.ok) {
                         const blob = await response.blob();
@@ -4392,13 +4617,15 @@ def monthly_statement_interface():
             
             async function exportCSV() {
                 if (!currentStatement) return;
-                
+
                 try {
                     const company = document.getElementById('company').value;
                     const year = document.getElementById('year').value;
                     const month = document.getElementById('month').value;
-                    
-                    const response = await fetch(`/analytics/api/export-csv-statement?company=${company}&year=${year}&month=${month}`);
+
+                    // Get base path for API calls (handles nginx proxy at /stripe/)
+                    const basePath = window.location.pathname.split('/analytics/')[0];
+                    const response = await fetch(`${basePath}/analytics/api/export-csv-statement?company=${company}&year=${year}&month=${month}`);
                     
                     if (response.ok) {
                         const blob = await response.blob();
@@ -4725,4 +4952,216 @@ def export_customer_subscriptions():
         return jsonify({
             "success": False,
             "error": str(e)
+        }), 500
+
+
+@analytics_bp.route('/csv-upload', methods=['GET', 'POST'])
+def csv_upload():
+    """CSV upload interface and handler for multiple files with clear/replace option"""
+    if request.method == 'GET':
+        return render_template('analytics/csv_upload.html')
+    
+    try:
+        from werkzeug.utils import secure_filename
+        from app import db
+        from app.models import Transaction, StripeAccount
+        import csv
+        import io
+        from decimal import Decimal
+        from datetime import datetime as dt
+        
+        # Check for clear database option
+        clear_db = request.form.get('clear_database') == 'true'
+
+        # Get selected company from form
+        selected_company = request.form.get('company', 'cgge').lower()
+        company_map = {'cgge': 'CGGE', 'ki': 'KI', 'kt': 'KT'}
+
+        if clear_db:
+            # Clear existing transactions for the account being uploaded
+            logger.info("Clearing database before import...")
+            Transaction.query.delete()
+            db.session.commit()
+            logger.info("Database cleared successfully")
+
+        uploaded_files = request.files.getlist('csv_files')
+
+        if not uploaded_files or all(f.filename == '' for f in uploaded_files):
+            return jsonify({
+                'success': False,
+                'error': 'No files selected for upload'
+            }), 400
+
+        total_imported = 0
+        total_existing = 0
+        files_processed = 0
+        files_saved = 0
+        errors = []
+
+        # Determine root directory for saving Stripe report files
+        import os
+        root_dir = os.environ.get('ROOT_CSV_PATH', '/app')
+        if not os.path.exists(root_dir):
+            root_dir = os.getcwd()
+
+        for file in uploaded_files:
+            if file.filename == '':
+                continue
+
+            original_filename = secure_filename(file.filename)
+
+            # Add company prefix if not already present
+            filename_lower = original_filename.lower()
+            if not any(filename_lower.startswith(prefix) for prefix in ['cgge_', 'ki_', 'kt_']):
+                filename = f"{selected_company}_{original_filename}"
+            else:
+                filename = original_filename
+
+            logger.info(f"Processing file: {original_filename} -> {filename}")
+
+            try:
+                # Read file content
+                file_content = file.stream.read()
+
+                # Save file to disk for monthly statement generator (PRIORITY - always do this)
+                save_path = os.path.join(root_dir, filename)
+                with open(save_path, 'wb') as f:
+                    f.write(file_content)
+                files_saved += 1
+                files_processed += 1
+                logger.info(f"Saved file to: {save_path}")
+
+                # Try to process for database import (optional - don't fail if database unavailable)
+                try:
+                    stream = io.StringIO(file_content.decode("UTF8"), newline=None)
+                    csv_reader = csv.DictReader(stream)
+
+                    file_imported = 0
+                    file_existing = 0
+
+                    # Use selected company for account
+                    account_name = company_map.get(selected_company, 'CGGE')
+
+                    # Get or create account
+                    account = StripeAccount.query.filter_by(name=account_name).first()
+                    if not account:
+                        account = StripeAccount(name=account_name, is_active=True)
+                        db.session.add(account)
+                        db.session.commit()
+                except Exception as db_err:
+                    logger.warning(f"Database import skipped for {filename}: {db_err}")
+                    continue  # File is saved, skip database import
+                
+                for row in csv_reader:
+                    try:
+                        # Get charge ID
+                        charge_id = row.get('id', '').strip()
+                        if not charge_id or charge_id == '.':
+                            continue
+                        
+                        # Check if already exists
+                        existing = Transaction.query.filter_by(
+                            stripe_id=charge_id,
+                            account_id=account.id
+                        ).first()
+                        
+                        if existing:
+                            file_existing += 1
+                            continue
+                        
+                        # Parse amount
+                        amount_str = row.get('Amount', '0').replace(',', '').strip()
+                        try:
+                            amount = Decimal(amount_str) if amount_str else Decimal('0')
+                        except:
+                            amount = Decimal('0')
+                        
+                        # Parse currency
+                        currency = row.get('Currency', 'hkd').lower().strip()
+                        
+                        # Parse fee
+                        fee_str = row.get('Fee', '0').replace(',', '').strip()
+                        try:
+                            fee = Decimal(fee_str) if fee_str else Decimal('0')
+                        except:
+                            fee = Decimal('0')
+                        
+                        # Parse dates
+                        created_date_str = row.get('Created date (UTC)', '').strip()
+                        try:
+                            created_date = dt.strptime(created_date_str, '%Y-%m-%d %H:%M:%S')
+                        except:
+                            try:
+                                created_date = dt.strptime(created_date_str, '%Y-%m-%d %H:%M')
+                            except:
+                                created_date = dt.now()
+                        
+                        # Create transaction
+                        transaction = Transaction(
+                            stripe_id=charge_id,
+                            account_id=account.id,
+                            amount=amount,
+                            currency=currency,
+                            fee=fee,
+                            status=row.get('Status', 'unknown').lower(),
+                            type=row.get('webhook_event_type (metadata)', 'charge'),
+                            description=row.get('Description', ''),
+                            customer_email=row.get('Customer Email', ''),
+                            stripe_created=created_date,
+                            created_at=dt.now()
+                        )
+                        
+                        db.session.add(transaction)
+                        file_imported += 1
+                        
+                    except Exception as row_error:
+                        logger.error(f"Error processing row in {filename}: {row_error}")
+                        continue
+
+                # Try to commit database changes
+                try:
+                    db.session.commit()
+                    total_imported += file_imported
+                    total_existing += file_existing
+                    logger.info(f"File {filename}: {file_imported} imported, {file_existing} already exist")
+                except Exception as commit_error:
+                    logger.warning(f"Database commit failed for {filename}: {commit_error}")
+                    db.session.rollback()
+
+            except Exception as file_error:
+                logger.error(f"Error saving file {filename}: {file_error}")
+                errors.append(f"{filename}: {str(file_error)}")
+                continue
+        
+        if files_processed == 0:
+            return jsonify({
+                'success': False,
+                'error': 'No files could be processed',
+                'details': errors
+            }), 400
+        
+        message = f"Successfully processed {files_processed} file(s) for {company_map.get(selected_company, selected_company.upper())}. "
+        message += f"{files_saved} file(s) saved for monthly statements. "
+        if clear_db:
+            message += f"{total_imported} transactions imported after clearing database. "
+        else:
+            message += f"{total_imported} new transactions imported, {total_existing} already existed. "
+        
+        if errors:
+            message += f"Errors: {', '.join(errors)}"
+        
+        return jsonify({
+            'success': True,
+            'message': message,
+            'files_processed': files_processed,
+            'total_imported': total_imported,
+            'total_existing': total_existing,
+            'cleared_database': clear_db
+        })
+        
+    except Exception as e:
+        logger.error(f"CSV upload error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
