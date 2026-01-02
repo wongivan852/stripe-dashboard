@@ -97,6 +97,12 @@ def create_app():
             </div>
             
             <div class="test-section">
+                <h2>📤 Data Management</h2>
+                <button onclick="window.location.href='/analytics/csv-upload'" class="api-button">Upload CSV Files</button>
+                <p style="margin-top: 10px; color: #64748b;">Import multiple CSV files to update transaction data</p>
+            </div>
+            
+            <div class="test-section">
                 <h2>🔗 Quick Links</h2>
                 <button onclick="window.open('/analytics/simple', '_blank')">Simple Analytics</button>
                 <button onclick="window.open('/analytics/monthly-statement', '_blank')">Monthly Generator</button>
