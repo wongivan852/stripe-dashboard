@@ -22,8 +22,11 @@ def create_app():
         # Use environment variable if provided (production/Docker)
         app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
     else:
-        # Use absolute path for development to ensure consistent database access
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////Users/wongivan/stripe-dashboard/instance/payments.db'
+        # Use relative path for development - works across different environments
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        instance_dir = os.path.join(base_dir, 'instance')
+        os.makedirs(instance_dir, exist_ok=True)
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_dir, "payments.db")}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Initialize extensions
