@@ -1,16 +1,99 @@
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, request, redirect, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from functools import wraps
 import os
 import json
+import requests
+import logging
 from datetime import datetime
 
 # Load environment variables automatically
 from dotenv import load_dotenv
 load_dotenv()
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 db = SQLAlchemy()
 migrate = Migrate()
+
+# SSO Configuration
+SSO_BASE_URL = os.environ.get('SSO_BASE_URL', 'http://localhost:8080')
+SSO_SECRET_KEY = os.environ.get('SSO_SECRET_KEY', 'default-secret-key')
+APP_NAME = 'stripe_dashboard'
+SSO_ENABLED = os.environ.get('SSO_ENABLED', 'false').lower() == 'true'
+
+
+def get_sso_login_url(return_url=None):
+    """Generate SSO login URL for redirecting to central platform"""
+    login_url = f"{SSO_BASE_URL}/auth/login/"
+    if return_url:
+        login_url += f"?next={return_url}"
+    return login_url
+
+
+def validate_sso_token(sso_token):
+    """Validate SSO token with central platform"""
+    try:
+        response = requests.get(
+            f"{SSO_BASE_URL}/auth/api/sso/validate/",
+            params={'token': sso_token, 'app_name': APP_NAME},
+            timeout=5
+        )
+        if response.status_code == 200:
+            user_response = requests.get(
+                f"{SSO_BASE_URL}/auth/api/sso/user-info/",
+                params={'token': sso_token},
+                timeout=5
+            )
+            if user_response.status_code == 200:
+                return user_response.json()
+    except requests.RequestException as e:
+        logger.error(f"SSO authentication failed: {e}")
+    return None
+
+
+def sso_logout(sso_token):
+    """Handle SSO logout - notify central platform"""
+    if sso_token:
+        try:
+            requests.post(
+                f"{SSO_BASE_URL}/auth/api/sso/logout/",
+                json={'token': sso_token},
+                timeout=5
+            )
+        except requests.RequestException as e:
+            logger.warning(f"Failed to notify central platform of logout: {e}")
+
+
+def login_required(f):
+    """Decorator to require authentication (only when SSO is enabled)"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Skip SSO check if not enabled (development mode)
+        if not SSO_ENABLED:
+            return f(*args, **kwargs)
+
+        if 'user' not in session:
+            # Check for SSO token
+            sso_token = request.args.get('sso_token')
+            if sso_token:
+                user_data = validate_sso_token(sso_token)
+                if user_data:
+                    session['user'] = user_data
+                    session['sso_token'] = sso_token
+                    # Redirect to remove token from URL
+                    return redirect(request.path)
+
+            # Redirect to SSO login
+            return_url = request.url
+            sso_login_url = f"{get_sso_login_url()}?app=stripe_dashboard&return_to={return_url}"
+            return redirect(sso_login_url)
+
+        return f(*args, **kwargs)
+    return decorated_function
 
 def create_app():
     app = Flask(__name__)
@@ -56,8 +139,21 @@ def create_app():
                 'timestamp': datetime.now().isoformat()
             }), 200
     
+    # Logout route
+    @app.route('/logout')
+    def logout():
+        """Handle logout"""
+        sso_token = session.get('sso_token')
+        if sso_token:
+            sso_logout(sso_token)
+        session.clear()
+        if SSO_ENABLED:
+            return redirect(f"{SSO_BASE_URL}/auth/logout/")
+        return redirect('/')
+
     # Main routes
     @app.route('/')
+    @login_required
     def index():
         return '''
         <!DOCTYPE html>
@@ -105,6 +201,14 @@ def create_app():
                 <p style="margin-top: 10px; color: #64748b;">Import multiple CSV files to update transaction data</p>
             </div>
             
+            <div class="test-section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+                <h2>💳 Unified Payment Dashboard (Stripe + WeChat Pay)</h2>
+                <p style="margin-bottom: 15px;">Combined view of all payment sources with fee categorization</p>
+                <button onclick="window.open('/analytics/unified-dashboard', '_blank')" style="background: white; color: #667eea; font-weight: bold;">Open Unified Dashboard</button>
+                <button onclick="window.open('/analytics/api/unified-fee-summary', '_blank')" style="background: rgba(255,255,255,0.2); color: white;">Fee Summary API</button>
+                <button onclick="window.open('/analytics/api/unified-payments', '_blank')" style="background: rgba(255,255,255,0.2); color: white;">All Transactions API</button>
+            </div>
+
             <div class="test-section">
                 <h2>🔗 Quick Links</h2>
                 <button onclick="window.open('/analytics/simple', '_blank')">Simple Analytics</button>
