@@ -17,6 +17,74 @@ analytics_bp = Blueprint('analytics', __name__)
 # Setup logging for analytics
 logger = logging.getLogger(__name__)
 
+def get_balance_summary(company_id, from_date, to_date):
+    """Read balance summary from CSV files to get starting/ending balances"""
+    import glob
+
+    # Map company_id to company code
+    company_map = {
+        '1': 'CGGE',
+        '2': 'KI',
+        '3': 'KT',
+        '4': 'CGGE_SZ',
+        'cgge': 'CGGE',
+        'ki': 'KI',
+        'kt': 'KT',
+        'cgge_sz': 'CGGE_SZ',
+    }
+    company_code = company_map.get(str(company_id).lower(), 'CGGE')
+
+    # Find balance summary file in data directory
+    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    data_dir = os.path.join(root_dir, 'data')
+
+    # Try different filename patterns
+    patterns = [
+        f"{company_code}_Balance_Summary_{from_date}_*{to_date}*.csv",
+        f"{company_code}_Balance_Summary_{from_date}_to_{to_date}*.csv",
+        f"{company_code}_Balance_Summary_{from_date}__{to_date}*.csv",
+        f"{company_code}_Balance_Summary_*.csv",
+    ]
+
+    balance_file = None
+    for pattern in patterns:
+        files = glob.glob(os.path.join(data_dir, pattern))
+        if files:
+            balance_file = files[0]
+            break
+
+    result = {
+        'starting_balance': 0.0,
+        'ending_balance': 0.0,
+        'currency': 'HKD'
+    }
+
+    if not balance_file or not os.path.exists(balance_file):
+        return result
+
+    try:
+        with open(balance_file, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                category = row.get('category', '').strip().lower()
+                net_amount = row.get('net_amount', '0').strip()
+                currency = row.get('currency', 'hkd').strip().upper()
+
+                try:
+                    amount = float(net_amount.replace(',', ''))
+                except:
+                    amount = 0.0
+
+                if category == 'starting_balance':
+                    result['starting_balance'] = amount
+                    result['currency'] = currency
+                elif category == 'ending_balance':
+                    result['ending_balance'] = amount
+    except Exception as e:
+        logger.error(f"Error reading balance summary: {e}")
+
+    return result
+
 @analytics_bp.route('/api/export-test')
 def export_test():
     """Test endpoint to verify CSV export functionality"""
@@ -2342,31 +2410,27 @@ def generate_statement():
             for tx in transactions:
                 amount_hkd = tx['amount']
                 fee_hkd = tx['fee']
-                total_amount += amount_hkd
+                # Subtract refunds from total
+                if tx.get('is_refund') or tx.get('status') == 'refunded':
+                    total_amount -= amount_hkd
+                else:
+                    total_amount += amount_hkd
                 total_fees += fee_hkd
         
-        # If no transactions found in CSV, fallback to DB
+        # If no transactions found in CSV, don't fallback to sample data
+        # CSV is the authoritative source - 0 transactions means 0 transactions
         if not transactions:
-            transactions = get_transactions_from_database(
-                company_filter=company_id,
-                status_filter=status_filter,
-                from_date=from_date,
-                to_date=to_date,
-                period=period
-            )
-            # Recalculate for DB transactions
             total_amount = 0
             total_fees = 0
-            for tx in transactions:
-                amount_hkd = tx['amount']
-                fee_hkd = tx['fee']
-                total_amount += amount_hkd
-                total_fees += fee_hkd
         
         # Calculate status counts
         status_counts = {}
         for tx in transactions:
             status_counts[tx['status']] = status_counts.get(tx['status'], 0) + 1
+
+        # Get balance summary for starting/ending balances
+        balance_summary = get_balance_summary(company_id, from_date, to_date)
+
         if format_type == 'csv':
             return generate_csv_statement(transactions)
         elif format_type == 'summary':
@@ -2378,7 +2442,7 @@ def generate_statement():
                 'period': period,
                 'from_date': from_date,
                 'to_date': to_date
-            })
+            }, balance_summary)
             
     except Exception as e:
         return f'''
@@ -2413,32 +2477,128 @@ def generate_statement():
         </html>
         '''
 
-def generate_detailed_statement(transactions, status_counts, total_amount, total_fees, filters):
-    """Generate detailed HTML statement optimized for landscape printing"""
+def generate_detailed_statement(transactions, status_counts, total_amount, total_fees, filters, balance_summary=None):
+    """Generate detailed HTML statement matching the Monthly Statement template format"""
     from datetime import datetime
-    
-    # Format date range for display
+
+    # Default balance summary if not provided
+    if balance_summary is None:
+        balance_summary = {'starting_balance': 0.0, 'ending_balance': 0.0, 'currency': 'HKD'}
+
+    # Parse date range for display
+    month_year = "Statement"
+    from_date_str = filters.get('from_date', '')
+    to_date_str = filters.get('to_date', '')
+    if from_date_str:
+        try:
+            from_dt = datetime.strptime(from_date_str, '%Y-%m-%d')
+            month_year = from_dt.strftime('%B %Y')
+        except:
+            month_year = "Statement"
+
+    # Format date range for display (used in template)
     date_range = "All Time"
-    if filters['period'] and filters['period'] not in ['custom', 'preset-nov2021', 'preset-2021']:
+    if filters.get('period') and filters['period'] not in ['custom', 'preset-nov2021', 'preset-2021']:
         date_range = f"Last {filters['period']} days"
-    elif filters['from_date'] and filters['to_date']:
-        date_range = f"{filters['from_date']} to {filters['to_date']}"
-    
-    # Get company name from CSV service
-    company_name = "All Companies"
+    elif from_date_str and to_date_str:
+        date_range = f"{from_date_str} to {to_date_str}"
+
+    # Get company name
+    company_name = "CGGE"
+    company_code = "cgge"
     if filters['company_id'] and filters['company_id'] != 'all':
         csv_service = CSVTransactionService()
         companies = csv_service.get_available_companies()
         for company in companies:
             if str(company['id']) == str(filters['company_id']):
                 company_name = company['name']
+                company_code = company_name.lower()
                 break
-    
+
+    # Calculate totals
+    starting_balance = balance_summary.get('starting_balance', 0.0)
+    ending_balance = balance_summary.get('ending_balance', 0.0)
+
+    # Separate payments, fees, refunds, and payouts
+    gross_payments = 0.0
+    total_processing_fees = 0.0
+    total_refunds = 0.0
+    total_payouts = 0.0
+
+    # Build transaction rows with running balance
+    transaction_rows = []
+    running_balance = starting_balance
+
+    # Sort transactions by date
+    sorted_txs = sorted(transactions, key=lambda x: x.get('created') or datetime.min)
+
+    for tx in sorted_txs:
+        tx_date = tx.get('created')
+        date_str = tx_date.strftime('%Y-%m-%d') if tx_date else 'N/A'
+        amount = float(tx.get('amount', 0))
+        fee = float(tx.get('fee', 0))
+        is_refund = tx.get('is_refund') or tx.get('status') == 'refunded'
+        customer_email = tx.get('customer_email', 'N/A')
+
+        if is_refund:
+            # Refund - money going out (Credit)
+            running_balance -= amount
+            total_refunds += amount
+            transaction_rows.append({
+                'date': date_str,
+                'nature': 'Refund',
+                'party': customer_email,
+                'debit': '',
+                'credit': f'HK${amount:,.2f}',
+                'balance': f'HK${running_balance:,.2f}',
+                'acknowledged': 'No',
+                'description': 'Refund'
+            })
+        else:
+            # Payment - money coming in (Debit)
+            running_balance += amount
+            gross_payments += amount
+            transaction_rows.append({
+                'date': date_str,
+                'nature': 'Gross Payment',
+                'party': customer_email,
+                'debit': f'HK${amount:,.2f}',
+                'credit': '',
+                'balance': f'HK${running_balance:,.2f}',
+                'acknowledged': 'No',
+                'description': 'Gross'
+            })
+
+            # Processing Fee - money going out (Credit)
+            if fee > 0:
+                running_balance -= fee
+                total_processing_fees += fee
+                transaction_rows.append({
+                    'date': date_str,
+                    'nature': 'Processing Fee',
+                    'party': 'Stripe',
+                    'debit': '',
+                    'credit': f'HK${fee:,.2f}',
+                    'balance': f'HK${running_balance:,.2f}',
+                    'acknowledged': 'No',
+                    'description': 'Processing fee'
+                })
+
+    # Calculate net balance change
+    net_balance_change = gross_payments - total_processing_fees - total_refunds
+
+    # Calculate total payouts (difference between expected ending and actual ending)
+    expected_ending = starting_balance + net_balance_change
+    total_payouts = expected_ending - ending_balance if expected_ending > ending_balance else 0
+
+    # Count only payment transactions (not fees)
+    payment_count = len([tx for tx in transactions if not (tx.get('is_refund') or tx.get('status') == 'refunded')])
+
     html = f'''
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Bank Statement - {company_name}</title>
+        <title>Monthly Statement - {month_year}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
             * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -2728,6 +2888,10 @@ def generate_detailed_statement(transactions, status_counts, total_amount, total
             </div>
             
             <div class="summary-cards">
+                <div class="summary-card" style="border-left: 4px solid #3b82f6;">
+                    <div class="summary-number">HK${balance_summary['starting_balance']:,.2f}</div>
+                    <div class="summary-label">Starting Balance</div>
+                </div>
                 <div class="summary-card">
                     <div class="summary-number">{len(transactions):,}</div>
                     <div class="summary-label">Total Transactions</div>
@@ -2747,6 +2911,10 @@ def generate_detailed_statement(transactions, status_counts, total_amount, total
                 <div class="summary-card" style="border-left: 4px solid #8b5cf6;">
                     <div class="summary-number">{((total_fees / total_amount * 100) if total_amount > 0 else 0):.2f}%</div>
                     <div class="summary-label">Fee Rate</div>
+                </div>
+                <div class="summary-card" style="border-left: 4px solid #ef4444;">
+                    <div class="summary-number">HK${balance_summary['ending_balance']:,.2f}</div>
+                    <div class="summary-label">Ending Balance</div>
                 </div>
     '''
     
@@ -5165,3 +5333,365 @@ def csv_upload():
             'success': False,
             'error': str(e)
         }), 500
+
+
+@analytics_bp.route('/monthly-statement-v2')
+def monthly_statement_v2():
+    """Generate monthly statement matching the PDF template format"""
+    from datetime import datetime
+
+    # Get parameters
+    company_id = request.args.get('company', '1')
+    from_date = request.args.get('from_date', '2025-12-01')
+    to_date = request.args.get('to_date', '2025-12-31')
+
+    # Get transactions
+    csv_service = CSVTransactionService()
+    transactions = csv_service.get_all_transactions(
+        company_filter=company_id,
+        from_date=from_date,
+        to_date=to_date
+    )
+
+    # Get balance summary
+    balance_summary = get_balance_summary(company_id, from_date, to_date)
+
+    # Parse month/year for title
+    try:
+        from_dt = datetime.strptime(from_date, '%Y-%m-%d')
+        month_year = from_dt.strftime('%B %Y')
+        last_day = to_date
+    except:
+        month_year = "Statement"
+        last_day = to_date
+
+    # Get company name
+    company_name = "CGGE"
+    company_map = {'1': 'cgge', '2': 'ki', '3': 'kt'}
+    company_code = company_map.get(str(company_id), 'cgge')
+
+    # Calculate totals
+    starting_balance = balance_summary.get('starting_balance', 0.0)
+    ending_balance = balance_summary.get('ending_balance', 0.0)
+
+    # Build transaction list with running balance
+    gross_payments = 0.0
+    total_fees = 0.0
+    total_refunds = 0.0
+
+    # Sort transactions by date
+    sorted_txs = sorted(transactions, key=lambda x: x.get('created') or datetime.min)
+
+    # Build transaction rows
+    transaction_rows_html = ""
+    running_balance = starting_balance
+    sale_cards_html = ""
+    sale_number = 0
+
+    for tx in sorted_txs:
+        tx_date = tx.get('created')
+        date_str = tx_date.strftime('%Y-%m-%d') if tx_date else 'N/A'
+        amount = float(tx.get('amount', 0))
+        fee = float(tx.get('fee', 0))
+        is_refund = tx.get('is_refund') or tx.get('status') == 'refunded'
+        customer_email = tx.get('customer_email', 'N/A')
+
+        if is_refund:
+            running_balance -= amount
+            total_refunds += amount
+            transaction_rows_html += f'''
+                <tr>
+                    <td>{date_str}</td>
+                    <td>Refund</td>
+                    <td>{customer_email}</td>
+                    <td></td>
+                    <td style="color: #dc2626;">HK${amount:,.2f}</td>
+                    <td>HK${running_balance:,.2f}</td>
+                    <td>No</td>
+                    <td>Refund</td>
+                </tr>
+            '''
+            # Refund processing fees
+            if fee > 0:
+                running_balance -= fee
+                total_fees += fee
+                transaction_rows_html += f'''
+                    <tr>
+                        <td>{date_str}</td>
+                        <td>Refund Fee</td>
+                        <td>Stripe</td>
+                        <td></td>
+                        <td style="color: #dc2626;">HK${fee:,.2f}</td>
+                        <td>HK${running_balance:,.2f}</td>
+                        <td>No</td>
+                        <td>Refund processing fee</td>
+                    </tr>
+                '''
+        else:
+            # Gross Payment
+            running_balance += amount
+            gross_payments += amount
+            transaction_rows_html += f'''
+                <tr>
+                    <td>{date_str}</td>
+                    <td>Gross Payment</td>
+                    <td>{customer_email}</td>
+                    <td style="color: #059669;">HK${amount:,.2f}</td>
+                    <td></td>
+                    <td>HK${running_balance:,.2f}</td>
+                    <td>No</td>
+                    <td>Gross</td>
+                </tr>
+            '''
+
+            # Processing Fee
+            if fee > 0:
+                running_balance -= fee
+                total_fees += fee
+                transaction_rows_html += f'''
+                    <tr>
+                        <td>{date_str}</td>
+                        <td>Processing Fee</td>
+                        <td>Stripe</td>
+                        <td></td>
+                        <td style="color: #dc2626;">HK${fee:,.2f}</td>
+                        <td>HK${running_balance:,.2f}</td>
+                        <td>No</td>
+                        <td>Processing fee</td>
+                    </tr>
+                '''
+
+            # Build sale card for non-refund transactions
+            sale_number += 1
+            customer_name = tx.get('customer_name', customer_email)
+            site = tx.get('site', 'N/A')
+            product_name = tx.get('product_name', 'N/A')
+            plan_days = tx.get('plan_days', '')
+            active_date = tx.get('active_date', 'N/A')
+            expiry_date = tx.get('expiry_date', 'N/A')
+            customer_amount = tx.get('customer_amount', '')
+            customer_currency = tx.get('customer_currency', '')
+            source_id = tx.get('stripe_id', 'N/A')
+
+            original_amount_str = f"{customer_amount} {customer_currency}" if customer_amount and customer_currency else "N/A"
+            plan_str = f"{product_name} ({plan_days} days)" if plan_days else product_name
+
+            sale_cards_html += f'''
+                <div class="sale-card">
+                    <div class="sale-header">
+                        <span class="sale-title">Sale #{sale_number} - {date_str}</span>
+                        <span class="sale-amount">HK${amount:,.2f}</span>
+                    </div>
+                    <div class="sale-details">
+                        <div class="detail-row"><span class="detail-label">Customer Email:</span><span class="detail-value">{customer_email}</span></div>
+                        <div class="detail-row"><span class="detail-label">User Name:</span><span class="detail-value">{customer_name}</span></div>
+                        <div class="detail-row"><span class="detail-label">Site/Service:</span><span class="detail-value">{site}</span></div>
+                        <div class="detail-row"><span class="detail-label">Subscription Plan:</span><span class="detail-value">{plan_str}</span></div>
+                        <div class="detail-row"><span class="detail-label">Active Date:</span><span class="detail-value">{active_date}</span></div>
+                        <div class="detail-row"><span class="detail-label">Expiry Date:</span><span class="detail-value">{expiry_date}</span></div>
+                        <div class="detail-row"><span class="detail-label">Original Amount:</span><span class="detail-value">{original_amount_str}</span></div>
+                        <div class="detail-row"><span class="detail-label">Converted Amount:</span><span class="detail-value">HK${amount:,.2f}</span></div>
+                        <div class="detail-row"><span class="detail-label">Processing Fee:</span><span class="detail-value">HK${fee:,.2f}</span></div>
+                        <div class="detail-row"><span class="detail-label">Transaction ID:</span><span class="detail-value">{source_id}</span></div>
+                    </div>
+                </div>
+            '''
+
+    # Calculate activity before fees (gross payments minus refunds)
+    activity_before_fees = gross_payments - total_refunds
+
+    # Net balance change = activity before fees - fees
+    net_balance_change = activity_before_fees - total_fees
+
+    # Total payouts = starting + net change - ending
+    total_payouts = starting_balance + net_balance_change - ending_balance
+
+    # Count transactions
+    payment_count = len([tx for tx in transactions if not (tx.get('is_refund') or tx.get('status') == 'refunded')])
+
+    html = f'''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Monthly Statement - {month_year}</title>
+        <meta charset="UTF-8">
+        <style>
+            * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; line-height: 1.5; }}
+            .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+            .no-print {{ }}
+            @media print {{
+                .no-print {{ display: none !important; }}
+                body {{ background: white; }}
+                .container {{ max-width: none; padding: 0; }}
+            }}
+
+            /* Action buttons */
+            .action-bar {{
+                background: white; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px;
+                display: flex; gap: 15px; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }}
+            .action-btn {{
+                padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;
+                font-weight: 500; display: flex; align-items: center; gap: 8px;
+                text-decoration: none; color: #333; background: #f0f0f0;
+            }}
+            .action-btn:hover {{ background: #e0e0e0; }}
+            .action-btn.primary {{ background: #3b82f6; color: white; }}
+            .action-btn.primary:hover {{ background: #2563eb; }}
+
+            /* Header */
+            .header {{ text-align: center; padding: 30px 0; }}
+            .header h1 {{ font-size: 28px; color: #1e293b; margin-bottom: 8px; }}
+            .header .company {{ color: #64748b; font-size: 16px; }}
+
+            /* Statement Summary Box */
+            .summary-box {{
+                background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+                padding: 24px; margin-bottom: 30px;
+            }}
+            .summary-box h2 {{ color: #3b82f6; font-size: 20px; margin-bottom: 20px; }}
+            .summary-grid {{
+                display: grid; grid-template-columns: 1fr 1fr; gap: 12px 40px;
+            }}
+            .summary-row {{
+                display: flex; justify-content: space-between; padding: 8px 0;
+                border-bottom: 1px solid #f1f5f9;
+            }}
+            .summary-label {{ color: #3b82f6; font-weight: 600; }}
+            .summary-value {{ font-weight: 600; color: #1e293b; }}
+
+            /* Transaction Details */
+            .section-title {{ color: #3b82f6; font-size: 20px; margin: 30px 0 15px; }}
+            table {{ width: 100%; border-collapse: collapse; background: white; }}
+            th, td {{ padding: 12px; text-align: left; border: 1px solid #e2e8f0; }}
+            th {{ background: #f8fafc; font-weight: 600; color: #475569; }}
+            .debit {{ color: #059669; font-weight: 600; }}
+            .credit {{ color: #dc2626; font-weight: 600; }}
+            .subtotal-row {{ background: #fef3c7; font-weight: 600; }}
+            .balance-row {{ background: #f0fdf4; }}
+
+            /* Sales Cards */
+            .sales-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 20px; margin-top: 20px; }}
+            .sale-card {{
+                background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+                overflow: hidden;
+            }}
+            .sale-header {{
+                display: flex; justify-content: space-between; align-items: center;
+                padding: 15px 20px; border-bottom: 2px solid #3b82f6;
+            }}
+            .sale-title {{ color: #3b82f6; font-weight: 600; }}
+            .sale-amount {{ color: #3b82f6; font-size: 20px; font-weight: 700; }}
+            .sale-details {{ padding: 15px 20px; }}
+            .detail-row {{
+                display: flex; justify-content: space-between; padding: 8px 0;
+                border-bottom: 1px solid #f1f5f9;
+            }}
+            .detail-row:last-child {{ border-bottom: none; }}
+            .detail-label {{ font-weight: 600; color: #475569; }}
+            .detail-value {{ color: #1e293b; text-align: right; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="action-bar no-print">
+                <button class="action-btn" onclick="window.print()">🖨️ Print</button>
+                <a href="/analytics/statement-generator" class="action-btn">📄 New Statement</a>
+                <a href="/" class="action-btn">🏠 Home</a>
+            </div>
+
+            <div class="header">
+                <h1>📋 Monthly Statement - {month_year}</h1>
+                <div class="company">Company: {company_code}</div>
+            </div>
+
+            <div class="summary-box">
+                <h2>Statement Summary</h2>
+                <div class="summary-grid">
+                    <div class="summary-row">
+                        <span class="summary-label">Starting Balance:</span>
+                        <span class="summary-value">HK${starting_balance:,.2f}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Activity Before Fees:</span>
+                        <span class="summary-value">HK${activity_before_fees:,.2f}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Less Fees:</span>
+                        <span class="summary-value">HK${total_fees:,.2f}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Net Balance Change:</span>
+                        <span class="summary-value">HK${net_balance_change:,.2f}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Total Payouts:</span>
+                        <span class="summary-value">HK${total_payouts:,.2f}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Ending Balance:</span>
+                        <span class="summary-value">HK${ending_balance:,.2f}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Total Transactions:</span>
+                        <span class="summary-value">{payment_count}</span>
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="section-title">Transaction Details</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Nature</th>
+                        <th>Party</th>
+                        <th>Debit</th>
+                        <th>Credit</th>
+                        <th>Balance</th>
+                        <th>Acknowledged</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="balance-row">
+                        <td>{from_date}</td>
+                        <td>Starting Balance</td>
+                        <td>Brought Forward</td>
+                        <td></td>
+                        <td class="credit">HK${starting_balance:,.2f}</td>
+                        <td>HK${starting_balance:,.2f}</td>
+                        <td>Yes</td>
+                        <td>Starting balance for {month_year}</td>
+                    </tr>
+                    {transaction_rows_html}
+                    <tr class="subtotal-row">
+                        <td colspan="3"><strong>SUBTOTAL</strong></td>
+                        <td class="debit"><strong>HK${gross_payments:,.2f}</strong></td>
+                        <td class="credit"><strong>HK${total_fees + total_refunds:,.2f}</strong></td>
+                        <td colspan="3"></td>
+                    </tr>
+                    <tr class="balance-row">
+                        <td>{last_day}</td>
+                        <td>Ending Balance</td>
+                        <td>Carry Forward</td>
+                        <td></td>
+                        <td class="credit">HK${ending_balance:,.2f}</td>
+                        <td>HK${ending_balance:,.2f}</td>
+                        <td>Yes</td>
+                        <td>Ending balance for {month_year}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2 class="section-title">Sales Transaction Details</h2>
+            <div class="sales-grid">
+                {sale_cards_html}
+            </div>
+        </div>
+    </body>
+    </html>
+    '''
+
+    return html

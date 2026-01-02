@@ -74,13 +74,74 @@ class CSVTransactionService:
         
         # Multiple file patterns to support different CSV formats
         file_patterns = [
+            "*_balance_history.csv",  # New balance history format (priority)
             "*unified_payments_*.csv",
-            "Itemised_balance_change_from_activity_*.csv", 
+            "Itemised_balance_change_from_activity_*.csv",
             "*transactions*.csv",
             "*payments*.csv",
             "*.csv"
         ]
-        
+
+        # Also check the data directory for balance_history files
+        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        data_dir = os.path.join(root_dir, 'data')
+        if os.path.exists(data_dir):
+            balance_history_files = glob.glob(os.path.join(data_dir, '*_balance_history.csv'))
+            for file_path in balance_history_files:
+                # Extract company code from filename (e.g., 'cgge' from 'cgge_balance_history.csv')
+                filename = os.path.basename(file_path).lower()
+                if filename.startswith('cgge'):
+                    company_dir = 'cgge'
+                elif filename.startswith('ki_') or 'krystal_institute' in filename:
+                    company_dir = 'krystal_institute'
+                elif filename.startswith('kt_') or 'krystal_technology' in filename:
+                    company_dir = 'krystal_technology'
+                else:
+                    company_dir = None
+                csv_files.append((file_path, company_dir))
+            if balance_history_files:
+                self.logger.info(f"Found {len(balance_history_files)} balance_history files in data directory")
+
+            # Also check for stripe_*_payments.csv files (KI and KT format)
+            # Skip CGGE payments file if balance_history exists (avoid duplicates)
+            companies_with_balance_history = set()
+            for f in balance_history_files:
+                fn = os.path.basename(f).lower()
+                if 'cgge' in fn:
+                    companies_with_balance_history.add('cgge')
+                elif 'ki' in fn:
+                    companies_with_balance_history.add('ki')
+                elif 'kt' in fn:
+                    companies_with_balance_history.add('kt')
+
+            stripe_payment_files = glob.glob(os.path.join(data_dir, 'stripe_*_payments.csv'))
+            for file_path in stripe_payment_files:
+                filename = os.path.basename(file_path).lower()
+                if '_ki_' in filename:
+                    if 'ki' in companies_with_balance_history:
+                        continue  # Skip - already have balance_history
+                    company_dir = 'krystal_institute'
+                elif '_kt_' in filename:
+                    if 'kt' in companies_with_balance_history:
+                        continue  # Skip - already have balance_history
+                    company_dir = 'krystal_technology'
+                elif '_cgge_' in filename or 'cgge' in filename:
+                    if 'cgge' in companies_with_balance_history:
+                        continue  # Skip - already have balance_history
+                    company_dir = 'cgge'
+                else:
+                    company_dir = None
+                csv_files.append((file_path, company_dir))
+            if stripe_payment_files:
+                self.logger.info(f"Found {len(stripe_payment_files)} stripe payment files in data directory")
+
+            # Load WeChat payment files (CGGE SZ) - files with merchant ID pattern
+            wechat_files = glob.glob(os.path.join(data_dir, '1718108528_*.csv'))  # WeChat merchant ID
+            for file_path in wechat_files:
+                csv_files.append((file_path, 'cgge_sz'))  # Attribute to CGGE SZ
+            if wechat_files:
+                self.logger.info(f"Found {len(wechat_files)} WeChat payment files in data directory")
+
         # Check for company subdirectory structure
         company_dirs = ['cgge', 'krystal_institute', 'krystal_technology']
         has_company_dirs = all(os.path.isdir(os.path.join(self.csv_directory, dir_name)) for dir_name in company_dirs)
@@ -182,7 +243,7 @@ class CSVTransactionService:
                 self.logger.error(f"CSV file not readable: {csv_file}")
                 return []
             
-            with open(csv_file, 'r', newline='', encoding='utf-8') as file:
+            with open(csv_file, 'r', newline='', encoding='utf-8-sig') as file:  # utf-8-sig handles BOM
                 reader = csv.DictReader(file)
                 
                 # Check if file has expected headers
@@ -195,12 +256,13 @@ class CSVTransactionService:
                     row_count += 1
                     
                     # Skip empty rows - check for different ID field names
-                    row_id = (row.get('balance_transaction_id') or 
-                             row.get('id') or 
+                    row_id = (row.get('balance_transaction_id') or
+                             row.get('id') or
                              row.get('transaction_id') or
-                             row.get('payment_id'))
-                    
-                    if not row_id or not row_id.strip():
+                             row.get('payment_id') or
+                             row.get('微信订单号'))  # WeChat order number
+
+                    if not row_id or not str(row_id).replace('`', '').strip():
                         continue
                         
                     try:
@@ -227,13 +289,19 @@ class CSVTransactionService:
     
     def _parse_csv_row(self, row, company_dir=None, csv_file=None):
         """Parse a CSV row into transaction format - supports multiple CSV formats"""
-        
+
         # Detect CSV format based on available columns
+        is_balance_history = 'Created (UTC)' in row and 'Type' in row
         is_unified_payments = 'Created date (UTC)' in row
         is_balance_change = 'balance_transaction_id' in row
-        
+        is_wechat = '交易时间' in row or '微信订单号' in row  # WeChat Chinese headers
+
         try:
-            if is_unified_payments:
+            if is_wechat:
+                return self._parse_wechat_row(row, company_dir, csv_file)
+            elif is_balance_history:
+                return self._parse_balance_history_row(row, company_dir, csv_file)
+            elif is_unified_payments:
                 return self._parse_unified_payments_row(row, company_dir, csv_file)
             elif is_balance_change:
                 return self._parse_balance_change_row(row, company_dir, csv_file)
@@ -243,6 +311,148 @@ class CSVTransactionService:
         except Exception as e:
             self.logger.error(f"Error parsing CSV row: {e}")
             return None
+
+    def _parse_wechat_row(self, row, company_dir=None, csv_file=None):
+        """Parse WeChat payment CSV format (Chinese headers)"""
+        # Clean backticks from all values
+        def clean_value(val):
+            if val is None:
+                return ''
+            return str(val).replace('`', '').strip()
+
+        # Skip summary rows (e.g., "总交易单数")
+        tx_time = clean_value(row.get('交易时间', ''))
+        if not tx_time or '总交易' in tx_time or not tx_time[0].isdigit():
+            return None
+
+        # Get transaction status
+        status_raw = clean_value(row.get('交易状态', ''))
+        if status_raw != 'SUCCESS':
+            return None  # Only process successful transactions
+
+        # Parse amount and fee (in CNY)
+        try:
+            amount_cny = float(clean_value(row.get('应结订单金额', 0)) or 0)
+            fee_cny = float(clean_value(row.get('手续费', 0)) or 0)
+        except (ValueError, TypeError):
+            amount_cny = 0
+            fee_cny = 0
+
+        if amount_cny == 0:
+            return None  # Skip zero amount transactions
+
+        # Parse transaction time
+        try:
+            created = datetime.strptime(tx_time, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            created = None
+
+        # Get other fields
+        order_id = clean_value(row.get('微信订单号', ''))
+        merchant_order = clean_value(row.get('商户订单号', ''))
+        product_name = clean_value(row.get('商品名称', ''))
+        user_id = clean_value(row.get('用户标识', ''))
+
+        # Company name from directory
+        company_name = self._get_company_name_from_dir(company_dir) if company_dir else 'CGGE SZ'
+
+        return {
+            'id': order_id or merchant_order,
+            'stripe_id': order_id,  # Use WeChat order ID
+            'amount': amount_cny,
+            'fee': fee_cny,
+            'net_amount': amount_cny - fee_cny,
+            'currency': 'CNY',
+            'status': 'succeeded',
+            'type': 'charge',
+            'description': product_name,
+            'customer_email': user_id,  # WeChat user ID as identifier
+            'created': created,
+            'stripe_created': created,
+            'available_on': created.date() if created else None,
+            'account_name': company_name,
+            'company_id': self._get_company_id(company_name),
+            'reporting_category': 'charge',
+            'is_refund': False,
+            'payment_method': 'WeChat Pay'
+        }
+
+    def _parse_balance_history_row(self, row, company_dir=None, csv_file=None):
+        """Parse balance_history.csv format (Stripe Balance History export)"""
+        # Skip payout transactions - only process payments
+        tx_type = row.get('Type', '').strip().lower()
+        if tx_type == 'payout':
+            return None
+
+        # Parse the created date - format: "2025-12-24 02:52"
+        created_str = row.get('Created (UTC)', '').strip()
+        created = None
+        if created_str:
+            try:
+                created = datetime.strptime(created_str, '%Y-%m-%d %H:%M')
+            except ValueError:
+                try:
+                    created = datetime.strptime(created_str, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    self.logger.warning(f"Invalid date format in balance_history: {created_str}")
+                    return None
+
+        # Parse amounts
+        try:
+            amount = float(row.get('Amount', '0').replace(',', '') or 0)
+            fee = float(row.get('Fee', '0').replace(',', '') or 0)
+            net = float(row.get('Net', '0').replace(',', '') or 0)
+        except (ValueError, TypeError):
+            amount = fee = net = 0
+
+        currency = (row.get('Currency', 'hkd') or 'hkd').strip().upper()
+
+        # Determine company from filename or company_dir
+        if company_dir:
+            company_name = self._get_company_name_from_dir(company_dir)
+        elif csv_file:
+            company_name = self._extract_company_from_filename(csv_file)
+        else:
+            company_name = 'CGGE'  # Default
+
+        # Map type to status
+        status = 'succeeded'
+        if tx_type == 'payment_refund' or tx_type == 'refund':
+            status = 'refunded'
+
+        # Get customer info from metadata
+        customer_email = row.get('Customer Email', '').strip()
+        customer_name = row.get('3. User name (metadata)', '').strip()
+        description = row.get('Description', '').strip()
+
+        stripe_id = row.get('id', '').strip()
+        source_id = row.get('Source', '').strip()
+
+        return {
+            'id': stripe_id or source_id,
+            'stripe_id': source_id,
+            'balance_transaction_id': stripe_id,
+            'amount': abs(amount),  # Use absolute for display
+            'fee': abs(fee),
+            'net_amount': net,
+            'currency': currency,
+            'status': status,
+            'type': 'charge' if tx_type in ['payment', 'charge'] else tx_type,
+            'description': description,
+            'customer_email': customer_email if customer_email else 'N/A',
+            'customer_name': customer_name,
+            'created': created,
+            'stripe_created': created,
+            'available_on': created.date() if created else None,
+            'account_name': company_name,
+            'company_id': self._get_company_id(company_name),
+            'is_refund': tx_type in ['payment_refund', 'refund'],
+            # Metadata
+            'site': row.get('1. Site (metadata)', '').strip(),
+            'product_name': row.get('4. Product name (metadata)', '').strip(),
+            'customer_amount': row.get('Customer Facing Amount', '').strip(),
+            'customer_currency': row.get('Customer Facing Currency', '').strip(),
+        }
     
     def _parse_unified_payments_row(self, row, company_dir=None, csv_file=None):
         """Parse unified payments CSV format (like cgge_unified_payments_20250731.csv)"""
@@ -275,12 +485,19 @@ class CSVTransactionService:
         # Get status - map from Status field
         status_raw = (row.get('Status') or '').lower().strip()
         status = self._map_status_field(status_raw)
-        
+
+        # Skip failed, canceled, and incomplete transactions
+        if status in ['failed', 'canceled']:
+            return None
+
+        # Check if this is a refund
+        is_refund = status == 'refunded'
+
         # Get other fields
         stripe_id = row.get('id', '').strip()
         description = row.get('Description', '').strip()
         customer_email = row.get('Customer Email', '').strip() or self._extract_customer_email(description)
-        
+
         return {
             'id': stripe_id,
             'stripe_id': stripe_id,
@@ -289,7 +506,7 @@ class CSVTransactionService:
             'net_amount': amount - fee,
             'currency': currency.upper(),
             'status': status,
-            'type': 'charge',
+            'type': 'refund' if is_refund else 'charge',
             'description': description,
             'customer_email': customer_email if customer_email else 'N/A',
             'created': created,
@@ -297,7 +514,8 @@ class CSVTransactionService:
             'available_on': created.date() if created else None,
             'account_name': company_name,
             'company_id': self._get_company_id(company_name),
-            'reporting_category': 'charge'
+            'reporting_category': 'refund' if is_refund else 'charge',
+            'is_refund': is_refund
         }
     
     def _parse_balance_change_row(self, row, company_dir=None, csv_file=None):
@@ -423,7 +641,8 @@ class CSVTransactionService:
         dir_to_company = {
             'cgge': 'CGGE',
             'krystal_institute': 'Krystal Institute',
-            'krystal_technology': 'Krystal Technology'
+            'krystal_technology': 'Krystal Technology',
+            'cgge_sz': 'CGGE SZ'
         }
         return dir_to_company.get(company_dir, 'Unknown Company')
     
@@ -444,9 +663,9 @@ class CSVTransactionService:
         """Map status field from unified payments CSV to standard status"""
         if not status_raw:
             return 'succeeded'
-            
+
         status_lower = status_raw.lower().strip()
-        
+
         if status_lower == 'paid':
             return 'succeeded'
         elif status_lower == 'failed':
@@ -455,6 +674,10 @@ class CSVTransactionService:
             return 'canceled'
         elif status_lower == 'pending':
             return 'pending'
+        elif status_lower == 'refunded':
+            return 'refunded'
+        elif status_lower in ['requires_action', 'requires_payment_method']:
+            return 'failed'  # Treat incomplete payments as failed
         else:
             return 'succeeded'  # Default
     
@@ -482,7 +705,8 @@ class CSVTransactionService:
             'CGGE': 1,
             'Krystal Institute': 2,
             'Krystal Technology': 3,
-            'Combined Account': 4,
+            'CGGE SZ': 4,  # WeChat payments (Shenzhen)
+            'Combined Account': 0,
             'Unknown Company': 0
         }
         return company_map.get(company_name, 0)
@@ -570,11 +794,12 @@ class CSVTransactionService:
         """Get list of available companies from CSV data"""
         companies = []
         
-        # Always provide the three main companies even if no data is found yet
+        # Always provide the main companies even if no data is found yet
         predefined_companies = [
             {'id': 1, 'name': 'CGGE'},
             {'id': 2, 'name': 'Krystal Institute'},
-            {'id': 3, 'name': 'Krystal Technology'}
+            {'id': 3, 'name': 'Krystal Technology'},
+            {'id': 4, 'name': 'CGGE SZ', 'code': 'cgge_sz'}  # WeChat payments (Shenzhen)
         ]
         
         # Get companies that have actual transactions
@@ -584,7 +809,7 @@ class CSVTransactionService:
         for tx in sample_transactions:
             company_id = tx['company_id']
             company_name = tx['account_name']
-            if company_id not in [1, 2, 3]:  # Not one of the predefined companies
+            if company_id not in [1, 2, 3, 4]:  # Not one of the predefined companies
                 actual_companies.add((company_id, company_name))
         
         # Add predefined companies first

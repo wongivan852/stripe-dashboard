@@ -1897,7 +1897,27 @@ class CompleteCsvService:
 
     def _read_stripe_itemised_activity(self, year, month, company_filter, start_date, end_date):
         """Read itemised balance change from activity CSV file"""
-        # Look for files like: cgge_Itemised_balance_change_from_activity_HKD_2025-11-01_to_2025-11-29_UTC.csv
+        # First, try to find balance_history.csv file (new format)
+        balance_history_patterns = [
+            f"{company_filter}_balance_history.csv",
+            f"{company_filter.upper()}_balance_history.csv",
+        ]
+
+        for pattern in balance_history_patterns:
+            # Check in data directory first
+            data_dir = os.path.join(self.root_directory, 'data')
+            file_path = os.path.join(data_dir, pattern)
+            if os.path.exists(file_path):
+                self.logger.info(f"Found balance_history file: {file_path}")
+                return self._parse_balance_history_csv(file_path, start_date, end_date)
+
+            # Check in root directory
+            file_path = os.path.join(self.root_directory, pattern)
+            if os.path.exists(file_path):
+                self.logger.info(f"Found balance_history file: {file_path}")
+                return self._parse_balance_history_csv(file_path, start_date, end_date)
+
+        # Fall back to original Itemised_balance_change format
         pattern = f"{company_filter}_Itemised_balance_change_from_activity_*.csv"
         search_path = os.path.join(self.root_directory, pattern)
         files = glob.glob(search_path)
@@ -1912,6 +1932,116 @@ class CompleteCsvService:
                 return self._parse_stripe_itemised_activity(file_path)
 
         return []
+
+    def _parse_balance_history_csv(self, file_path, start_date, end_date):
+        """Parse the new balance_history.csv format (Stripe Balance History export)"""
+        transactions = []
+
+        try:
+            with open(file_path, 'r', newline='', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+
+                for row in reader:
+                    # Parse created date - format: "2025-12-24 02:52"
+                    created_str = row.get('Created (UTC)', '').strip()
+                    created = None
+                    if created_str:
+                        try:
+                            created = datetime.strptime(created_str, '%Y-%m-%d %H:%M')
+                        except ValueError:
+                            try:
+                                created = datetime.strptime(created_str, '%Y-%m-%d %H:%M:%S')
+                            except ValueError:
+                                continue
+
+                    # Filter by date range
+                    if created:
+                        created_date = created.date()
+                        start_date_cmp = start_date.date() if hasattr(start_date, 'date') else start_date
+                        end_date_cmp = end_date.date() if hasattr(end_date, 'date') else end_date
+                        if created_date < start_date_cmp or created_date > end_date_cmp:
+                            continue
+
+                    # Parse available_on date
+                    available_str = row.get('Available On (UTC)', '').strip()
+                    available_on = None
+                    if available_str:
+                        try:
+                            available_on = datetime.strptime(available_str, '%Y-%m-%d %H:%M')
+                        except ValueError:
+                            try:
+                                available_on = datetime.strptime(available_str, '%Y-%m-%d %H:%M:%S')
+                            except ValueError:
+                                pass
+
+                    # Parse amounts
+                    amount = self._parse_decimal(row.get('Amount', '0'))
+                    fee = self._parse_decimal(row.get('Fee', '0'))
+                    net = self._parse_decimal(row.get('Net', '0'))
+
+                    # Get transaction type and map to reporting_category
+                    tx_type = row.get('Type', '').strip().lower()
+
+                    # Map Type to reporting_category
+                    category_map = {
+                        'payment': 'charge',
+                        'charge': 'charge',
+                        'payment_refund': 'refund',
+                        'refund': 'refund',
+                        'payout': 'payout',
+                    }
+                    reporting_category = category_map.get(tx_type, tx_type)
+
+                    # Skip payouts - they're handled separately
+                    if tx_type == 'payout':
+                        continue
+
+                    # Get description and customer info
+                    description = row.get('Description', '').strip()
+                    customer_email = row.get('Customer Email', '').strip()
+                    customer_name = row.get('3. User name (metadata)', '').strip()
+                    site = row.get('1. Site (metadata)', '').strip()
+
+                    # Get original amount info
+                    customer_amount = row.get('Customer Facing Amount', '').strip()
+                    customer_currency = row.get('Customer Facing Currency', '').strip()
+
+                    # Get subscription/product info
+                    product_name = row.get('4. Product name (metadata)', '').strip()
+                    subs_type = row.get('subs_type (metadata)', '').strip()
+                    plan_days = row.get('plan_days (metadata)', '').strip()
+                    active_date = row.get('4. Active date (metadata)', '') or row.get('3. Active date (metadata)', '')
+                    expiry_date = row.get('5. Expiry date (metadata)', '') or row.get('4. Expiry date (metadata)', '')
+
+                    transactions.append({
+                        'balance_transaction_id': row.get('id', '').strip(),
+                        'source_id': row.get('Source', '').strip(),
+                        'created': created,
+                        'available_on': available_on,
+                        'currency': row.get('Currency', 'hkd').strip().upper(),
+                        'gross': float(amount),  # Amount is gross
+                        'fee': float(fee),
+                        'net': float(net),
+                        'reporting_category': reporting_category,
+                        'description': description,
+                        'type': 'activity',
+                        # Additional metadata for sales details
+                        'customer_email': customer_email,
+                        'customer_name': customer_name,
+                        'site': site,
+                        'customer_amount': customer_amount,
+                        'customer_currency': customer_currency,
+                        'product_name': product_name,
+                        'subs_type': subs_type,
+                        'plan_days': plan_days,
+                        'active_date': active_date.strip() if active_date else '',
+                        'expiry_date': expiry_date.strip() if expiry_date else '',
+                    })
+
+        except Exception as e:
+            self.logger.error(f"Error parsing balance_history CSV: {e}")
+
+        return transactions
 
     def _parse_stripe_itemised_activity(self, file_path):
         """Parse Stripe's Itemised Balance Change from Activity CSV format"""
@@ -1972,6 +2102,27 @@ class CompleteCsvService:
 
     def _read_stripe_itemised_payouts_detail(self, year, month, company_filter, start_date, end_date):
         """Read itemised payouts CSV file with full details"""
+        # First, try to find balance_history.csv file (new format) and extract payouts
+        balance_history_patterns = [
+            f"{company_filter}_balance_history.csv",
+            f"{company_filter.upper()}_balance_history.csv",
+        ]
+
+        for pattern in balance_history_patterns:
+            # Check in data directory first
+            data_dir = os.path.join(self.root_directory, 'data')
+            file_path = os.path.join(data_dir, pattern)
+            if os.path.exists(file_path):
+                self.logger.info(f"Extracting payouts from balance_history file: {file_path}")
+                return self._parse_payouts_from_balance_history(file_path, start_date, end_date)
+
+            # Check in root directory
+            file_path = os.path.join(self.root_directory, pattern)
+            if os.path.exists(file_path):
+                self.logger.info(f"Extracting payouts from balance_history file: {file_path}")
+                return self._parse_payouts_from_balance_history(file_path, start_date, end_date)
+
+        # Fall back to original Itemised_payouts format
         pattern = f"{company_filter}_Itemised_payouts_*.csv"
         search_path = os.path.join(self.root_directory, pattern)
         files = glob.glob(search_path)
@@ -1985,6 +2136,63 @@ class CompleteCsvService:
                 return self._parse_stripe_itemised_payouts_detail(file_path)
 
         return []
+
+    def _parse_payouts_from_balance_history(self, file_path, start_date, end_date):
+        """Extract payout transactions from balance_history.csv"""
+        payouts = []
+
+        try:
+            with open(file_path, 'r', newline='', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+
+                for row in reader:
+                    # Only process payout transactions
+                    tx_type = row.get('Type', '').strip().lower()
+                    if tx_type != 'payout':
+                        continue
+
+                    # Parse created date
+                    created_str = row.get('Created (UTC)', '').strip()
+                    created = None
+                    if created_str:
+                        try:
+                            created = datetime.strptime(created_str, '%Y-%m-%d %H:%M')
+                        except ValueError:
+                            try:
+                                created = datetime.strptime(created_str, '%Y-%m-%d %H:%M:%S')
+                            except ValueError:
+                                continue
+
+                    # Filter by date range
+                    if created:
+                        created_date = created.date()
+                        start_date_cmp = start_date.date() if hasattr(start_date, 'date') else start_date
+                        end_date_cmp = end_date.date() if hasattr(end_date, 'date') else end_date
+                        if created_date < start_date_cmp or created_date > end_date_cmp:
+                            continue
+
+                    # Parse amounts (payouts have negative amounts)
+                    amount = self._parse_decimal(row.get('Amount', '0'))
+                    fee = self._parse_decimal(row.get('Fee', '0'))
+                    net = self._parse_decimal(row.get('Net', '0'))
+
+                    payouts.append({
+                        'payout_id': row.get('Source', '').strip(),
+                        'balance_transaction_id': row.get('id', '').strip(),
+                        'effective_at': created,
+                        'arrival_date': created.date() if created else None,
+                        'currency': row.get('Currency', 'hkd').strip().upper(),
+                        'gross': float(amount),
+                        'fee': float(fee),
+                        'net': float(net),
+                        'description': row.get('Description', '').strip() or 'STRIPE PAYOUT',
+                        'type': 'payout'
+                    })
+
+        except Exception as e:
+            self.logger.error(f"Error extracting payouts from balance_history: {e}")
+
+        return payouts
 
     def _parse_stripe_itemised_payouts_detail(self, file_path):
         """Parse Stripe's Itemised Payouts CSV format with full details"""
