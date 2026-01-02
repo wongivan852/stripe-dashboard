@@ -5165,3 +5165,524 @@ def csv_upload():
             'success': False,
             'error': str(e)
         }), 500
+
+
+# =============================================================================
+# UNIFIED PAYMENT ENDPOINTS - Stripe + WeChat Pay with Fee Categorization
+# =============================================================================
+
+@analytics_bp.route('/api/unified-payments')
+def get_unified_payments():
+    """Get all payments from both Stripe and WeChat Pay with fee categorization"""
+    try:
+        from app.services.unified_payment_service import UnifiedPaymentService
+
+        service = UnifiedPaymentService()
+
+        # Get filter parameters
+        company = request.args.get('company')
+        status = request.args.get('status')
+        from_date = request.args.get('from_date')
+        to_date = request.args.get('to_date')
+        fee_category = request.args.get('fee_category')
+
+        transactions = service.get_all_transactions(
+            company_filter=company,
+            status_filter=status,
+            from_date=from_date,
+            to_date=to_date,
+            fee_category=fee_category
+        )
+
+        # Convert datetime objects to strings for JSON serialization
+        for tx in transactions:
+            if tx.get('created'):
+                tx['created'] = tx['created'].isoformat()
+            if tx.get('date'):
+                tx['date'] = str(tx['date'])
+
+        return jsonify({
+            'success': True,
+            'count': len(transactions),
+            'transactions': transactions,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Unified payments error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@analytics_bp.route('/api/unified-fee-summary')
+def get_unified_fee_summary():
+    """Get fee summary partitioned by Conference vs Subscription"""
+    try:
+        from app.services.unified_payment_service import UnifiedPaymentService
+
+        service = UnifiedPaymentService()
+
+        # Get date filter parameters
+        from_date = request.args.get('from_date')
+        to_date = request.args.get('to_date')
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)
+
+        # If year and month provided, use those
+        if year and month:
+            from datetime import date
+            from_date = date(year, month, 1)
+            if month == 12:
+                to_date = date(year + 1, 1, 1) - timedelta(days=1)
+            else:
+                to_date = date(year, month + 1, 1) - timedelta(days=1)
+
+        transactions = service.get_all_transactions(
+            status_filter='succeeded',
+            from_date=from_date,
+            to_date=to_date
+        )
+
+        summary = service.get_fee_summary(transactions)
+
+        return jsonify({
+            'success': True,
+            'summary': summary,
+            'filters': {
+                'from_date': str(from_date) if from_date else None,
+                'to_date': str(to_date) if to_date else None,
+                'year': year,
+                'month': month
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Fee summary error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@analytics_bp.route('/api/unified-monthly-summary')
+def get_unified_monthly_summary():
+    """Get monthly summary with fee breakdown by category"""
+    try:
+        from app.services.unified_payment_service import UnifiedPaymentService
+
+        service = UnifiedPaymentService()
+
+        # Get parameters
+        year = request.args.get('year', type=int) or datetime.now().year
+        month = request.args.get('month', type=int) or datetime.now().month
+        company = request.args.get('company')
+
+        summary = service.get_monthly_summary(year, month, company)
+
+        # Convert transactions for JSON
+        for tx in summary['transactions']:
+            if tx.get('created'):
+                tx['created'] = tx['created'].isoformat()
+            if tx.get('date'):
+                tx['date'] = str(tx['date'])
+
+        return jsonify({
+            'success': True,
+            'summary': summary,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Monthly summary error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@analytics_bp.route('/api/unified-health')
+def unified_health_check():
+    """Health check for unified payment service"""
+    try:
+        from app.services.unified_payment_service import UnifiedPaymentService
+
+        service = UnifiedPaymentService()
+        health = service.get_health_status()
+
+        status_code = 200 if health['status'] == 'healthy' else 500
+        return jsonify(health), status_code
+
+    except Exception as e:
+        logger.error(f"Unified health check error: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+
+@analytics_bp.route('/unified-dashboard')
+def unified_dashboard():
+    """Dashboard showing both Stripe and WeChat Pay data with fee categorization"""
+    try:
+        from app.services.unified_payment_service import UnifiedPaymentService
+
+        service = UnifiedPaymentService()
+
+        # Get current month data by default
+        year = request.args.get('year', type=int) or datetime.now().year
+        month = request.args.get('month', type=int) or datetime.now().month
+
+        # Get all succeeded transactions
+        transactions = service.get_all_transactions(status_filter='succeeded')
+
+        # Get fee summary
+        fee_summary = service.get_fee_summary(transactions)
+
+        # Get monthly summary
+        monthly = service.get_monthly_summary(year, month)
+
+        # Month names
+        month_names = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December']
+
+        return render_unified_dashboard_html(
+            fee_summary=fee_summary,
+            monthly_summary=monthly,
+            year=year,
+            month=month,
+            month_name=month_names[month],
+            companies=service.get_available_companies()
+        )
+
+    except Exception as e:
+        logger.error(f"Unified dashboard error: {e}")
+        return f'''
+        <!DOCTYPE html>
+        <html>
+        <head><title>Error</title></head>
+        <body style="font-family: sans-serif; margin: 40px; background: #fef2f2;">
+            <div style="background: white; padding: 30px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                <h1 style="color: #dc2626;">Dashboard Error</h1>
+                <p>Error loading unified dashboard: {str(e)}</p>
+                <a href="/" style="color: #4f46e5;">← Back to Home</a>
+            </div>
+        </body>
+        </html>
+        '''
+
+
+def render_unified_dashboard_html(fee_summary, monthly_summary, year, month, month_name, companies):
+    """Render the unified dashboard HTML with fee categorization"""
+
+    # Format currency values
+    def fmt_currency(value, currency='HKD'):
+        return f"HK${value:,.2f}" if currency == 'HKD' else f"¥{value:,.2f}"
+
+    # Build company cards HTML
+    company_cards = ""
+    for company_name, data in fee_summary['by_company'].items():
+        conf = data['by_category'].get('Conference', {'count': 0, 'amount': 0, 'fee': 0})
+        subs = data['by_category'].get('Subscription', {'count': 0, 'amount': 0, 'fee': 0})
+        other = data['by_category'].get('Other', {'count': 0, 'amount': 0, 'fee': 0})
+
+        company_cards += f'''
+        <div class="company-card">
+            <h3>{company_name}</h3>
+            <div class="company-stats">
+                <div class="stat-row">
+                    <span>Total Transactions:</span>
+                    <span class="stat-value">{data['count']}</span>
+                </div>
+                <div class="stat-row">
+                    <span>Total Amount:</span>
+                    <span class="stat-value">{fmt_currency(data['amount'])}</span>
+                </div>
+                <div class="stat-row">
+                    <span>Total Fees:</span>
+                    <span class="stat-value fee-amount">{fmt_currency(data['fee'])}</span>
+                </div>
+            </div>
+            <div class="category-breakdown">
+                <div class="category conference">
+                    <span class="category-label">Conference</span>
+                    <span class="category-count">{conf['count']} txns</span>
+                    <span class="category-amount">{fmt_currency(conf['amount'])}</span>
+                    <span class="category-fee">Fee: {fmt_currency(conf['fee'])}</span>
+                </div>
+                <div class="category subscription">
+                    <span class="category-label">Subscription</span>
+                    <span class="category-count">{subs['count']} txns</span>
+                    <span class="category-amount">{fmt_currency(subs['amount'])}</span>
+                    <span class="category-fee">Fee: {fmt_currency(subs['fee'])}</span>
+                </div>
+                <div class="category other">
+                    <span class="category-label">Other</span>
+                    <span class="category-count">{other['count']} txns</span>
+                    <span class="category-amount">{fmt_currency(other['amount'])}</span>
+                    <span class="category-fee">Fee: {fmt_currency(other['fee'])}</span>
+                </div>
+            </div>
+        </div>
+        '''
+
+    # Get totals
+    total = fee_summary['total']
+    by_cat = fee_summary['by_category']
+    by_src = fee_summary['by_source']
+
+    html = f'''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Unified Payment Dashboard - Stripe + WeChat Pay</title>
+        <style>
+            * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #f0f4f8; color: #334155; line-height: 1.6;
+            }}
+            .container {{ max-width: 1400px; margin: 0 auto; padding: 20px; }}
+
+            .header {{
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white; padding: 2rem; text-align: center; border-radius: 16px;
+                margin-bottom: 2rem; box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+            }}
+            .header h1 {{ font-size: 2rem; margin-bottom: 0.5rem; }}
+            .header p {{ opacity: 0.9; }}
+
+            .navigation {{
+                display: flex; justify-content: center; gap: 12px; margin-bottom: 2rem;
+                flex-wrap: wrap;
+            }}
+            .nav-link {{
+                padding: 10px 20px; background: white; color: #4f46e5; text-decoration: none;
+                border-radius: 8px; font-weight: 500; transition: all 0.2s;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            }}
+            .nav-link:hover {{ background: #4f46e5; color: white; transform: translateY(-2px); }}
+            .nav-link.active {{ background: #4f46e5; color: white; }}
+
+            .summary-grid {{
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem; margin-bottom: 2rem;
+            }}
+            .summary-card {{
+                background: white; padding: 1.5rem; border-radius: 12px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.06); text-align: center;
+            }}
+            .summary-card.conference {{ border-top: 4px solid #f59e0b; }}
+            .summary-card.subscription {{ border-top: 4px solid #10b981; }}
+            .summary-card.stripe {{ border-top: 4px solid #635bff; }}
+            .summary-card.wechat {{ border-top: 4px solid #07c160; }}
+            .summary-card .value {{ font-size: 1.8rem; font-weight: 700; color: #1e293b; }}
+            .summary-card .label {{ color: #64748b; font-size: 0.9rem; margin-top: 4px; }}
+            .summary-card .sub-value {{ font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }}
+
+            .section-title {{
+                font-size: 1.4rem; font-weight: 600; color: #1e293b;
+                margin: 2rem 0 1rem; display: flex; align-items: center; gap: 8px;
+            }}
+
+            .fee-breakdown {{
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 1.5rem; margin-bottom: 2rem;
+            }}
+            .fee-card {{
+                background: white; padding: 1.5rem; border-radius: 12px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            }}
+            .fee-card h4 {{
+                font-size: 1.1rem; color: #1e293b; margin-bottom: 1rem;
+                padding-bottom: 0.5rem; border-bottom: 2px solid #e5e7eb;
+            }}
+            .fee-row {{
+                display: flex; justify-content: space-between; padding: 8px 0;
+                border-bottom: 1px solid #f1f5f9;
+            }}
+            .fee-row:last-child {{ border-bottom: none; }}
+            .fee-row .label {{ color: #64748b; }}
+            .fee-row .value {{ font-weight: 600; color: #1e293b; }}
+            .fee-row.highlight {{ background: #f0fdf4; margin: 0 -1rem; padding: 8px 1rem; }}
+
+            .company-grid {{
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 1.5rem;
+            }}
+            .company-card {{
+                background: white; padding: 1.5rem; border-radius: 12px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            }}
+            .company-card h3 {{
+                font-size: 1.2rem; color: #1e293b; margin-bottom: 1rem;
+                padding-bottom: 0.5rem; border-bottom: 2px solid #4f46e5;
+            }}
+            .company-stats {{ margin-bottom: 1rem; }}
+            .stat-row {{
+                display: flex; justify-content: space-between; padding: 6px 0;
+            }}
+            .stat-value {{ font-weight: 600; }}
+            .fee-amount {{ color: #dc2626; }}
+
+            .category-breakdown {{
+                display: flex; flex-direction: column; gap: 8px; margin-top: 1rem;
+            }}
+            .category {{
+                display: grid; grid-template-columns: 100px 80px 1fr 1fr;
+                gap: 8px; padding: 10px; border-radius: 8px; font-size: 0.9rem;
+                align-items: center;
+            }}
+            .category.conference {{ background: #fef3c7; }}
+            .category.subscription {{ background: #d1fae5; }}
+            .category.other {{ background: #f1f5f9; }}
+            .category-label {{ font-weight: 600; }}
+            .category-count {{ color: #64748b; }}
+            .category-amount {{ font-weight: 500; }}
+            .category-fee {{ color: #dc2626; font-size: 0.85rem; }}
+
+            .controls {{
+                background: white; padding: 1rem; border-radius: 12px;
+                margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;
+                align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            }}
+            .control-group {{ display: flex; flex-direction: column; gap: 4px; }}
+            .control-group label {{ font-size: 0.85rem; color: #64748b; font-weight: 500; }}
+            select {{
+                padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 8px;
+                font-size: 1rem; background: white; cursor: pointer;
+            }}
+            select:focus {{ outline: none; border-color: #4f46e5; }}
+            .btn {{
+                padding: 10px 20px; background: #4f46e5; color: white; border: none;
+                border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+            }}
+            .btn:hover {{ background: #4338ca; }}
+
+            .footer {{
+                text-align: center; padding: 2rem; color: #64748b; font-size: 0.9rem;
+            }}
+
+            @media (max-width: 768px) {{
+                .category {{ grid-template-columns: 1fr 1fr; }}
+                .header h1 {{ font-size: 1.5rem; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>Unified Payment Dashboard</h1>
+                <p>Stripe + WeChat Pay | Fee Categorization: Conference vs Subscription</p>
+            </div>
+
+            <div class="navigation">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/analytics/simple" class="nav-link">Simple View</a>
+                <a href="/analytics/unified-dashboard" class="nav-link active">Unified Dashboard</a>
+                <a href="/analytics/api/unified-fee-summary?format=json" class="nav-link">API: Fee Summary</a>
+                <a href="/analytics/api/unified-payments?format=json" class="nav-link">API: All Payments</a>
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label>Year</label>
+                    <select id="yearSelect" onchange="updateDashboard()">
+                        <option value="2024" {"selected" if year == 2024 else ""}>2024</option>
+                        <option value="2025" {"selected" if year == 2025 else ""}>2025</option>
+                        <option value="2026" {"selected" if year == 2026 else ""}>2026</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Month</label>
+                    <select id="monthSelect" onchange="updateDashboard()">
+                        <option value="1" {"selected" if month == 1 else ""}>January</option>
+                        <option value="2" {"selected" if month == 2 else ""}>February</option>
+                        <option value="3" {"selected" if month == 3 else ""}>March</option>
+                        <option value="4" {"selected" if month == 4 else ""}>April</option>
+                        <option value="5" {"selected" if month == 5 else ""}>May</option>
+                        <option value="6" {"selected" if month == 6 else ""}>June</option>
+                        <option value="7" {"selected" if month == 7 else ""}>July</option>
+                        <option value="8" {"selected" if month == 8 else ""}>August</option>
+                        <option value="9" {"selected" if month == 9 else ""}>September</option>
+                        <option value="10" {"selected" if month == 10 else ""}>October</option>
+                        <option value="11" {"selected" if month == 11 else ""}>November</option>
+                        <option value="12" {"selected" if month == 12 else ""}>December</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="updateDashboard()">Refresh</button>
+            </div>
+
+            <h2 class="section-title">Overall Summary (All Time)</h2>
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="value">{total['count']}</div>
+                    <div class="label">Total Transactions</div>
+                </div>
+                <div class="summary-card">
+                    <div class="value">{fmt_currency(total['amount'])}</div>
+                    <div class="label">Total Amount</div>
+                </div>
+                <div class="summary-card">
+                    <div class="value">{fmt_currency(total['fee'])}</div>
+                    <div class="label">Total Fees</div>
+                    <div class="sub-value">{(total['fee']/total['amount']*100) if total['amount'] > 0 else 0:.2f}% fee rate</div>
+                </div>
+                <div class="summary-card">
+                    <div class="value">{fmt_currency(total['net'])}</div>
+                    <div class="label">Net Amount</div>
+                </div>
+            </div>
+
+            <h2 class="section-title">Fee Breakdown by Category</h2>
+            <div class="summary-grid">
+                <div class="summary-card conference">
+                    <div class="value">{fmt_currency(by_cat['Conference']['fee'])}</div>
+                    <div class="label">Conference Fees</div>
+                    <div class="sub-value">{by_cat['Conference']['count']} transactions | {fmt_currency(by_cat['Conference']['amount'])} revenue</div>
+                </div>
+                <div class="summary-card subscription">
+                    <div class="value">{fmt_currency(by_cat['Subscription']['fee'])}</div>
+                    <div class="label">Subscription Fees</div>
+                    <div class="sub-value">{by_cat['Subscription']['count']} transactions | {fmt_currency(by_cat['Subscription']['amount'])} revenue</div>
+                </div>
+                <div class="summary-card stripe">
+                    <div class="value">{fmt_currency(by_src['stripe']['fee'])}</div>
+                    <div class="label">Stripe Fees</div>
+                    <div class="sub-value">{by_src['stripe']['count']} transactions | {fmt_currency(by_src['stripe']['amount'])} revenue</div>
+                </div>
+                <div class="summary-card wechat">
+                    <div class="value">{fmt_currency(by_src['wechat']['fee'])}</div>
+                    <div class="label">WeChat Pay Fees</div>
+                    <div class="sub-value">{by_src['wechat']['count']} transactions | {fmt_currency(by_src['wechat']['amount'])} revenue</div>
+                </div>
+            </div>
+
+            <h2 class="section-title">By Company/Account</h2>
+            <div class="company-grid">
+                {company_cards}
+            </div>
+
+            <div class="footer">
+                <p>Data updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                <p>Unified Payment Dashboard | Stripe + WeChat Pay Integration</p>
+            </div>
+        </div>
+
+        <script>
+            function updateDashboard() {{
+                const year = document.getElementById('yearSelect').value;
+                const month = document.getElementById('monthSelect').value;
+                window.location.href = `/analytics/unified-dashboard?year=${{year}}&month=${{month}}`;
+            }}
+        </script>
+    </body>
+    </html>
+    '''
+
+    return html
